@@ -602,3 +602,224 @@ CREATE TRIGGER update_matches_updated_at
 CREATE TRIGGER update_prompt_responses_updated_at
   BEFORE UPDATE ON public.prompt_responses
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- ============================================================================
+-- GAME SESSIONS TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.game_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id UUID NOT NULL REFERENCES public.chat_threads(id) ON DELETE CASCADE,
+  
+  -- Game configuration
+  game_type TEXT NOT NULL CHECK (game_type IN (
+    'truth_or_dare',
+    'hot_seat', 
+    'story_chain',
+    'mystery_date_planner',
+    'compatibility_triangle',
+    'group_challenge'
+  )),
+  
+  -- Game state
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'cancelled')),
+  current_turn_user_id UUID REFERENCES public.profiles(id),
+  turn_order UUID[] NOT NULL DEFAULT '{}',
+  current_round INTEGER DEFAULT 1,
+  max_rounds INTEGER,
+  
+  -- Game-specific config (stored as JSONB for flexibility)
+  config JSONB NOT NULL DEFAULT '{}',
+  
+  -- Game-specific state (changes during play)
+  game_state JSONB NOT NULL DEFAULT '{}',
+  
+  -- Metadata
+  started_by UUID REFERENCES public.profiles(id) NOT NULL,
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.game_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Index for quick lookups
+CREATE INDEX IF NOT EXISTS idx_game_sessions_thread_id ON public.game_sessions(thread_id);
+CREATE INDEX IF NOT EXISTS idx_game_sessions_status ON public.game_sessions(status);
+
+-- RLS Policies: Only thread participants can view/interact
+CREATE POLICY "Thread participants can view game sessions"
+  ON public.game_sessions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.chat_participants 
+      WHERE thread_id = game_sessions.thread_id 
+      AND user_id = auth.uid()
+      AND left_at IS NULL
+    )
+  );
+
+CREATE POLICY "Thread participants can create game sessions"
+  ON public.game_sessions FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.chat_participants 
+      WHERE thread_id = game_sessions.thread_id 
+      AND user_id = auth.uid()
+      AND left_at IS NULL
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = game_sessions.started_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Thread participants can update game sessions"
+  ON public.game_sessions FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.chat_participants 
+      WHERE thread_id = game_sessions.thread_id 
+      AND user_id = auth.uid()
+      AND left_at IS NULL
+    )
+  );
+
+-- ============================================================================
+-- GAME MOVES TABLE (for tracking individual actions)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.game_moves (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_session_id UUID REFERENCES public.game_sessions(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  
+  -- Move details
+  move_type TEXT NOT NULL,
+  move_data JSONB NOT NULL DEFAULT '{}',
+  
+  round_number INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.game_moves ENABLE ROW LEVEL SECURITY;
+
+-- Index for game history
+CREATE INDEX IF NOT EXISTS idx_game_moves_session ON public.game_moves(game_session_id);
+CREATE INDEX IF NOT EXISTS idx_game_moves_user ON public.game_moves(user_id);
+
+-- RLS Policies: Participants can view all, insert own
+CREATE POLICY "Participants can view game moves"
+  ON public.game_moves FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.game_sessions gs
+      JOIN public.chat_participants cp ON cp.thread_id = gs.thread_id
+      WHERE gs.id = game_moves.game_session_id
+      AND cp.user_id = auth.uid()
+      AND cp.left_at IS NULL
+    )
+  );
+
+CREATE POLICY "Participants can insert own moves"
+  ON public.game_moves FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = game_moves.user_id
+      AND user_id = auth.uid()
+    )
+  );
+
+-- ============================================================================
+-- CUSTOM GAME CONTENT TABLE (user-created challenges/questions)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.custom_game_content (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  
+  -- Content type
+  game_type TEXT NOT NULL CHECK (game_type IN ('truth_or_dare', 'hot_seat', 'story_chain')),
+  content_type TEXT NOT NULL,
+  
+  -- Content details
+  content TEXT NOT NULL,
+  category TEXT,
+  difficulty TEXT,
+  for_couples BOOLEAN DEFAULT false,
+  for_singles BOOLEAN DEFAULT true,
+  theme TEXT,
+  
+  -- Usage tracking
+  times_used INTEGER DEFAULT 0,
+  
+  -- Moderation
+  is_approved BOOLEAN DEFAULT true,
+  reported_count INTEGER DEFAULT 0,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.custom_game_content ENABLE ROW LEVEL SECURITY;
+
+-- Index for content retrieval
+CREATE INDEX IF NOT EXISTS idx_custom_content_game_type ON public.custom_game_content(game_type);
+CREATE INDEX IF NOT EXISTS idx_custom_content_creator ON public.custom_game_content(created_by);
+
+-- RLS Policies: Users can CRUD own, read approved content
+CREATE POLICY "Users can view own custom content"
+  ON public.custom_game_content FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can view approved content"
+  ON public.custom_game_content FOR SELECT
+  USING (is_approved = true);
+
+CREATE POLICY "Users can create own content"
+  ON public.custom_game_content FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update own content"
+  ON public.custom_game_content FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete own content"
+  ON public.custom_game_content FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+-- Add triggers for updated_at
+CREATE TRIGGER update_game_sessions_updated_at
+  BEFORE UPDATE ON public.game_sessions
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_custom_game_content_updated_at
+  BEFORE UPDATE ON public.custom_game_content
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
