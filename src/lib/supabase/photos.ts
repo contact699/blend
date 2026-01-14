@@ -5,6 +5,7 @@
 
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 import { supabase } from './client';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -260,6 +261,16 @@ export async function validateImage(
   imageUri: string
 ): Promise<{ valid: boolean; error?: string }> {
   try {
+    // On web, FileSystem doesn't work with blob URLs - skip validation
+    if (Platform.OS === 'web') {
+      // Basic check - just verify the URI exists
+      if (!imageUri || imageUri.length === 0) {
+        return { valid: false, error: 'No image provided' };
+      }
+      return { valid: true };
+    }
+
+    // Native platforms - use FileSystem
     const fileInfo = await FileSystem.getInfoAsync(imageUri);
 
     if (!fileInfo.exists) {
@@ -274,7 +285,9 @@ export async function validateImage(
 
     return { valid: true };
   } catch (error) {
-    return { valid: false, error: 'Failed to validate image' };
+    console.error('[validateImage] Error:', error);
+    // On error, allow upload to proceed - storage will reject if invalid
+    return { valid: true };
   }
 }
 

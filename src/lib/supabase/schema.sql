@@ -22,12 +22,15 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- RLS Policy: Users can only read/update their own data
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own data" ON public.users;
 CREATE POLICY "Users can view own data" ON public.users
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own record" ON public.users;
 CREATE POLICY "Users can insert own record" ON public.users
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own data" ON public.users;
 CREATE POLICY "Users can update own data" ON public.users
   FOR UPDATE USING (auth.uid() = id);
 
@@ -55,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- RLS Policy: Users can only modify their own profile, but can view active profiles of others
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view active profiles" ON public.profiles;
 CREATE POLICY "Users can view active profiles" ON public.profiles
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.users WHERE id = profiles.user_id AND is_active = true)
@@ -65,12 +69,15 @@ CREATE POLICY "Users can view active profiles" ON public.profiles
     )
   );
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own profile" ON public.profiles;
 CREATE POLICY "Users can delete own profile" ON public.profiles
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -89,6 +96,7 @@ CREATE TABLE IF NOT EXISTS public.photos (
 -- RLS Policy: Same as profiles
 ALTER TABLE public.photos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view photos of visible profiles" ON public.photos;
 CREATE POLICY "Users can view photos of visible profiles" ON public.photos
   FOR SELECT USING (
     EXISTS (
@@ -104,6 +112,7 @@ CREATE POLICY "Users can view photos of visible profiles" ON public.photos
     )
   );
 
+DROP POLICY IF EXISTS "Users can manage own photos" ON public.photos;
 CREATE POLICY "Users can manage own photos" ON public.photos
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = photos.profile_id AND user_id = auth.uid())
@@ -122,6 +131,7 @@ CREATE TABLE IF NOT EXISTS public.intents (
 
 ALTER TABLE public.intents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can view active intents" ON public.intents;
 CREATE POLICY "Anyone can view active intents" ON public.intents
   FOR SELECT USING (is_active = true);
 
@@ -138,9 +148,11 @@ CREATE TABLE IF NOT EXISTS public.profile_intents (
 
 ALTER TABLE public.profile_intents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view profile intents" ON public.profile_intents;
 CREATE POLICY "Users can view profile intents" ON public.profile_intents
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can manage own profile intents" ON public.profile_intents;
 CREATE POLICY "Users can manage own profile intents" ON public.profile_intents
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = profile_intents.profile_id AND user_id = auth.uid())
@@ -161,6 +173,7 @@ CREATE TABLE IF NOT EXISTS public.prompt_responses (
 
 ALTER TABLE public.prompt_responses ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view prompt responses" ON public.prompt_responses;
 CREATE POLICY "Users can view prompt responses" ON public.prompt_responses
   FOR SELECT USING (
     EXISTS (
@@ -174,6 +187,7 @@ CREATE POLICY "Users can view prompt responses" ON public.prompt_responses
     )
   );
 
+DROP POLICY IF EXISTS "Users can manage own prompt responses" ON public.prompt_responses;
 CREATE POLICY "Users can manage own prompt responses" ON public.prompt_responses
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = prompt_responses.profile_id AND user_id = auth.uid())
@@ -194,6 +208,7 @@ CREATE TABLE IF NOT EXISTS public.linked_partners (
 
 ALTER TABLE public.linked_partners ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view linked partners" ON public.linked_partners;
 CREATE POLICY "Users can view linked partners" ON public.linked_partners
   FOR SELECT USING (
     EXISTS (
@@ -202,6 +217,7 @@ CREATE POLICY "Users can view linked partners" ON public.linked_partners
     )
   );
 
+DROP POLICY IF EXISTS "Users can manage own linked partner" ON public.linked_partners;
 CREATE POLICY "Users can manage own linked partner" ON public.linked_partners
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = linked_partners.profile_id AND user_id = auth.uid())
@@ -225,12 +241,15 @@ CREATE TABLE IF NOT EXISTS public.matches (
 ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
 
 -- CRITICAL: Only match participants can access matches
+DROP POLICY IF EXISTS "Users can only see their own matches" ON public.matches;
 CREATE POLICY "Users can only see their own matches" ON public.matches
   FOR SELECT USING (auth.uid() = user_1_id OR auth.uid() = user_2_id);
 
+DROP POLICY IF EXISTS "Users can create matches they participate in" ON public.matches;
 CREATE POLICY "Users can create matches they participate in" ON public.matches
   FOR INSERT WITH CHECK (auth.uid() = user_1_id OR auth.uid() = user_2_id);
 
+DROP POLICY IF EXISTS "Match participants can update matches" ON public.matches;
 CREATE POLICY "Match participants can update matches" ON public.matches
   FOR UPDATE USING (auth.uid() = user_1_id OR auth.uid() = user_2_id);
 
@@ -246,6 +265,7 @@ CREATE TABLE IF NOT EXISTS public.match_intents (
 
 ALTER TABLE public.match_intents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Match participants can view match intents" ON public.match_intents;
 CREATE POLICY "Match participants can view match intents" ON public.match_intents
   FOR SELECT USING (
     EXISTS (
@@ -275,6 +295,7 @@ CREATE TABLE IF NOT EXISTS public.chat_threads (
 ALTER TABLE public.chat_threads ENABLE ROW LEVEL SECURITY;
 
 -- CRITICAL: Only thread participants can access threads
+DROP POLICY IF EXISTS "Thread participants can view threads" ON public.chat_threads;
 CREATE POLICY "Thread participants can view threads" ON public.chat_threads
   FOR SELECT USING (
     EXISTS (
@@ -288,6 +309,7 @@ CREATE POLICY "Thread participants can view threads" ON public.chat_threads
     )
   );
 
+DROP POLICY IF EXISTS "Match participants can create threads" ON public.chat_threads;
 CREATE POLICY "Match participants can create threads" ON public.chat_threads
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -297,6 +319,7 @@ CREATE POLICY "Match participants can create threads" ON public.chat_threads
     )
   );
 
+DROP POLICY IF EXISTS "Thread participants can update threads" ON public.chat_threads;
 CREATE POLICY "Thread participants can update threads" ON public.chat_threads
   FOR UPDATE USING (
     EXISTS (
@@ -320,6 +343,7 @@ CREATE TABLE IF NOT EXISTS public.chat_participants (
 
 ALTER TABLE public.chat_participants ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Participants can view participation" ON public.chat_participants;
 CREATE POLICY "Participants can view participation" ON public.chat_participants
   FOR SELECT USING (
     user_id = auth.uid()
@@ -352,6 +376,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 -- CRITICAL: Only conversation participants can read/write messages
+DROP POLICY IF EXISTS "Only participants can read messages" ON public.messages;
 CREATE POLICY "Only participants can read messages" ON public.messages
   FOR SELECT USING (
     EXISTS (
@@ -368,6 +393,7 @@ CREATE POLICY "Only participants can read messages" ON public.messages
     )
   );
 
+DROP POLICY IF EXISTS "Only participants can send messages" ON public.messages;
 CREATE POLICY "Only participants can send messages" ON public.messages
   FOR INSERT WITH CHECK (
     auth.uid() = sender_id
@@ -388,6 +414,7 @@ CREATE POLICY "Only participants can send messages" ON public.messages
   );
 
 -- Users can only update their own messages (for read receipts by others)
+DROP POLICY IF EXISTS "Message recipients can mark as read" ON public.messages;
 CREATE POLICY "Message recipients can mark as read" ON public.messages
   FOR UPDATE USING (
     sender_id != auth.uid()
@@ -426,15 +453,19 @@ CREATE TABLE IF NOT EXISTS public.likes (
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see likes sent TO them or FROM them
+DROP POLICY IF EXISTS "Users can see likes involving them" ON public.likes;
 CREATE POLICY "Users can see likes involving them" ON public.likes
   FOR SELECT USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
 
+DROP POLICY IF EXISTS "Users can create likes from themselves" ON public.likes;
 CREATE POLICY "Users can create likes from themselves" ON public.likes
   FOR INSERT WITH CHECK (auth.uid() = from_user_id);
 
+DROP POLICY IF EXISTS "Recipients can update like seen status" ON public.likes;
 CREATE POLICY "Recipients can update like seen status" ON public.likes
   FOR UPDATE USING (auth.uid() = to_user_id);
 
+DROP POLICY IF EXISTS "Senders can delete their likes" ON public.likes;
 CREATE POLICY "Senders can delete their likes" ON public.likes
   FOR DELETE USING (auth.uid() = from_user_id);
 
@@ -454,15 +485,19 @@ CREATE TABLE IF NOT EXISTS public.pinds (
 ALTER TABLE public.pinds ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see pinds sent TO them or FROM them
+DROP POLICY IF EXISTS "Users can see pinds involving them" ON public.pinds;
 CREATE POLICY "Users can see pinds involving them" ON public.pinds
   FOR SELECT USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
 
+DROP POLICY IF EXISTS "Users can create pinds from themselves" ON public.pinds;
 CREATE POLICY "Users can create pinds from themselves" ON public.pinds
   FOR INSERT WITH CHECK (auth.uid() = from_user_id);
 
+DROP POLICY IF EXISTS "Recipients can update pind read status" ON public.pinds;
 CREATE POLICY "Recipients can update pind read status" ON public.pinds
   FOR UPDATE USING (auth.uid() = to_user_id);
 
+DROP POLICY IF EXISTS "Users can delete their pinds" ON public.pinds;
 CREATE POLICY "Users can delete their pinds" ON public.pinds
   FOR DELETE USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
 
@@ -482,12 +517,15 @@ CREATE TABLE IF NOT EXISTS public.blocked_users (
 ALTER TABLE public.blocked_users ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see their own blocks
+DROP POLICY IF EXISTS "Users can see their blocks" ON public.blocked_users;
 CREATE POLICY "Users can see their blocks" ON public.blocked_users
   FOR SELECT USING (auth.uid() = blocker_id);
 
+DROP POLICY IF EXISTS "Users can create blocks" ON public.blocked_users;
 CREATE POLICY "Users can create blocks" ON public.blocked_users
   FOR INSERT WITH CHECK (auth.uid() = blocker_id);
 
+DROP POLICY IF EXISTS "Users can remove their blocks" ON public.blocked_users;
 CREATE POLICY "Users can remove their blocks" ON public.blocked_users
   FOR DELETE USING (auth.uid() = blocker_id);
 
@@ -509,9 +547,11 @@ CREATE TABLE IF NOT EXISTS public.reports (
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see and create their own reports
+DROP POLICY IF EXISTS "Users can see their reports" ON public.reports;
 CREATE POLICY "Users can see their reports" ON public.reports
   FOR SELECT USING (auth.uid() = reporter_id);
 
+DROP POLICY IF EXISTS "Users can create reports" ON public.reports;
 CREATE POLICY "Users can create reports" ON public.reports
   FOR INSERT WITH CHECK (auth.uid() = reporter_id);
 
@@ -587,18 +627,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON public.users;
 CREATE TRIGGER update_users_updated_at
   BEFORE UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_matches_updated_at ON public.matches;
 CREATE TRIGGER update_matches_updated_at
   BEFORE UPDATE ON public.matches
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_prompt_responses_updated_at ON public.prompt_responses;
 CREATE TRIGGER update_prompt_responses_updated_at
   BEFORE UPDATE ON public.prompt_responses
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

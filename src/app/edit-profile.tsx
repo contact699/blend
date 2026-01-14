@@ -7,6 +7,8 @@ import {
   ScrollView,
   TextInput,
   Switch,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,6 +23,7 @@ import {
   UserPlus,
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
+import { useUploadPhoto } from '@/lib/supabase';
 import { INTENTS } from '@/lib/mock-data';
 import { Intent, LinkedPartner } from '@/lib/types';
 import { cn } from '@/lib/cn';
@@ -48,10 +51,16 @@ export default function EditProfileScreen() {
   const [partnerName, setPartnerName] = useState(currentProfile?.linked_partner?.name || '');
   const [partnerAge, setPartnerAge] = useState(currentProfile?.linked_partner?.age?.toString() || '');
   const [partnerPhoto, setPartnerPhoto] = useState<string | undefined>(currentProfile?.linked_partner?.photo);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const uploadPhotoMutation = useUploadPhoto();
 
   const handleAddPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
+      return;
+    }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -61,7 +70,19 @@ export default function EditProfileScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setPhotos([...photos, result.assets[0].uri]);
+      setIsUploading(true);
+      try {
+        const uploadedPhoto = await uploadPhotoMutation.mutateAsync(result.assets[0].uri);
+        console.log('[EditProfile] Photo uploaded:', uploadedPhoto);
+        // Add the signed URL to local state for display
+        setPhotos([...photos, result.assets[0].uri]);
+        Alert.alert('Success', 'Photo uploaded successfully!');
+      } catch (error) {
+        console.error('[EditProfile] Upload error:', error);
+        Alert.alert('Upload failed', error instanceof Error ? error.message : 'Could not upload photo');
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -180,12 +201,19 @@ export default function EditProfileScreen() {
                 {photos.length < 6 && (
                   <Pressable
                     onPress={handleAddPhoto}
+                    disabled={isUploading}
                     className="w-[30%] aspect-square bg-zinc-900 rounded-xl items-center justify-center border border-dashed border-purple-500/50"
                   >
-                    <View className="w-10 h-10 bg-purple-500/20 rounded-full items-center justify-center mb-1">
-                      <Plus size={20} color="#c084fc" />
-                    </View>
-                    <Text className="text-purple-400 text-xs">Add Photo</Text>
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#c084fc" />
+                    ) : (
+                      <>
+                        <View className="w-10 h-10 bg-purple-500/20 rounded-full items-center justify-center mb-1">
+                          <Plus size={20} color="#c084fc" />
+                        </View>
+                        <Text className="text-purple-400 text-xs">Add Photo</Text>
+                      </>
+                    )}
                   </Pressable>
                 )}
               </View>

@@ -150,3 +150,114 @@ export function hasPhotos(profile: SupabaseProfile | Profile): boolean {
   if (!profile || !profile.photos) return false;
   return profile.photos.length > 0;
 }
+
+// ============================================================================
+// EVENT ADAPTERS
+// ============================================================================
+
+import { Event, EventHost, EventLocation, EventCategory, EventVisibility, EventStatus } from '../types';
+
+export interface SupabaseEvent {
+  id: string;
+  host_id: string;
+  title: string;
+  description: string;
+  cover_image_path: string | null;
+  category: string;
+  tags: string[];
+  location_name: string;
+  location_address: string | null;
+  location_city: string;
+  location_latitude: number | null;
+  location_longitude: number | null;
+  is_virtual: boolean;
+  virtual_link: string | null;
+  start_date: string;
+  end_date: string | null;
+  start_time: string;
+  end_time: string | null;
+  timezone: string;
+  max_attendees: number | null;
+  current_attendees: number;
+  waitlist_count: number;
+  visibility: string;
+  requires_approval: boolean;
+  status: string;
+  is_featured: boolean;
+  is_recurring: boolean;
+  recurring_pattern: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  host_profile?: {
+    user_id: string;
+    display_name: string;
+    photos?: Array<{ storage_path: string; signedUrl?: string }>;
+  };
+  event_rsvps?: Array<{ id: string; user_id: string; status: string }>;
+  coverImageSignedUrl?: string | null;
+}
+
+/**
+ * Transform Supabase event to App Event type
+ */
+export function transformEvent(supabaseEvent: SupabaseEvent): Event {
+  const location: EventLocation = {
+    name: supabaseEvent.location_name,
+    address: supabaseEvent.location_address || '',
+    city: supabaseEvent.location_city,
+    latitude: supabaseEvent.location_latitude || 0,
+    longitude: supabaseEvent.location_longitude || 0,
+    is_virtual: supabaseEvent.is_virtual,
+    virtual_link: supabaseEvent.virtual_link || undefined,
+  };
+
+  const host: EventHost = {
+    user_id: supabaseEvent.host_profile?.user_id || supabaseEvent.host_id,
+    display_name: supabaseEvent.host_profile?.display_name || 'Unknown Host',
+    photo: supabaseEvent.host_profile?.photos?.[0]?.signedUrl || 
+           supabaseEvent.host_profile?.photos?.[0]?.storage_path,
+    reputation_stars: 4, // Default, can be calculated later
+    events_hosted: 0, // Would need separate query
+  };
+
+  const coverImage = supabaseEvent.coverImageSignedUrl || 
+                     supabaseEvent.cover_image_path || 
+                     undefined;
+
+  return {
+    id: supabaseEvent.id,
+    host_id: supabaseEvent.host_id,
+    host,
+    title: supabaseEvent.title,
+    description: supabaseEvent.description,
+    cover_image: coverImage,
+    category: supabaseEvent.category as EventCategory,
+    tags: supabaseEvent.tags || [],
+    location,
+    start_date: supabaseEvent.start_date,
+    end_date: supabaseEvent.end_date || undefined,
+    start_time: supabaseEvent.start_time,
+    end_time: supabaseEvent.end_time || undefined,
+    timezone: supabaseEvent.timezone,
+    max_attendees: supabaseEvent.max_attendees || undefined,
+    current_attendees: supabaseEvent.current_attendees,
+    waitlist_count: supabaseEvent.waitlist_count,
+    visibility: supabaseEvent.visibility as EventVisibility,
+    requires_approval: supabaseEvent.requires_approval,
+    status: supabaseEvent.status as EventStatus,
+    is_featured: supabaseEvent.is_featured,
+    is_recurring: supabaseEvent.is_recurring,
+    recurring_pattern: supabaseEvent.recurring_pattern as Event['recurring_pattern'],
+    attendees: [], // Would need separate fetch for full attendee list
+    created_at: supabaseEvent.created_at,
+    updated_at: supabaseEvent.updated_at,
+  };
+}
+
+/**
+ * Transform array of Supabase events
+ */
+export function transformEvents(supabaseEvents: SupabaseEvent[]): Event[] {
+  return supabaseEvents.map(transformEvent);
+}

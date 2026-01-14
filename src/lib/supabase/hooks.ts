@@ -17,8 +17,8 @@ import {
   securePhotoUpload,
   deletePhoto,
 } from './photos';
-import { transformProfiles, SupabaseProfile } from './adapters';
-import type { Profile } from '../types';
+import { transformProfiles, SupabaseProfile, transformEvents, SupabaseEvent } from './adapters';
+import type { Profile, Event } from '../types';
 
 // ============================================================================
 // TYPES
@@ -962,26 +962,53 @@ export function useRemovePartnerLink() {
 // EVENTS HOOKS
 // ============================================================================
 
-interface EventWithDetails {
+interface EventDB {
   id: string;
-  created_by: string;
+  host_id: string;
   title: string;
   description: string;
-  location: string | null;
-  event_date: string;
-  event_time: string | null;
+  cover_image_path: string | null;
+  category: string;
+  tags: string[];
+  location_name: string;
+  location_address: string | null;
+  location_city: string;
+  location_latitude: number | null;
+  location_longitude: number | null;
+  is_virtual: boolean;
+  virtual_link: string | null;
+  start_date: string;
+  end_date: string | null;
+  start_time: string;
+  end_time: string | null;
+  timezone: string;
   max_attendees: number | null;
-  is_public: boolean;
-  image_path: string | null;
+  current_attendees: number;
+  waitlist_count: number;
+  visibility: 'public' | 'friends_only' | 'invite_only' | 'private';
+  requires_approval: boolean;
+  status: 'draft' | 'published' | 'cancelled' | 'completed';
+  is_featured: boolean;
+  is_recurring: boolean;
+  recurring_pattern: string | null;
   created_at: string;
   updated_at: string;
-  imageSignedUrl?: string | null;
-  attendee_count?: number;
-  current_user_status?: 'going' | 'interested' | 'not_going' | null;
-  creator_profile?: {
+}
+
+interface EventWithHost extends EventDB {
+  host_profile?: {
+    user_id: string;
     display_name: string;
     photos?: Array<{ storage_path: string; signedUrl?: string }>;
   };
+  event_rsvps?: Array<{
+    id: string;
+    user_id: string;
+    status: string;
+  }>;
+  // Computed fields
+  coverImageSignedUrl?: string | null;
+  current_user_status?: 'going' | 'maybe' | 'not_going' | 'waitlist' | 'pending_approval' | null;
 }
 
 /**
@@ -991,7 +1018,7 @@ export function useEvents() {
   const { data: user } = useCurrentUser();
 
   return useQuery({
-    queryKey: ['events', user?.id, user],
+    queryKey: ['events', user?.id],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
@@ -999,47 +1026,52 @@ export function useEvents() {
         .from('events')
         .select(`
           *,
-          creator_profile:profiles!events_created_by_fkey (
+          host_profile:profiles!events_host_id_fkey (
+            user_id,
             display_name,
             photos (storage_path)
           ),
-          event_attendees (id, user_id, status)
+          event_rsvps (id, user_id, status)
         `)
-        .eq('is_public', true)
-        .gte('event_date', new Date().toISOString().split('T')[0])
-        .order('event_date', { ascending: true });
+        .eq('visibility', 'public')
+        .eq('status', 'published')
+        .gte('start_date', new Date().toISOString().split('T')[0])
+        .order('start_date', { ascending: true });
 
       if (error) {
         console.error('[Events] Error fetching:', error);
         return [];
       }
 
-      const events = data as unknown as Array<EventWithDetails & { event_attendees: Array<{ id: string; user_id: string; status: string }> }>;
+      const events = data as unknown as EventWithHost[];
 
-      // Get signed URLs for event images and creator photos
+      // Get signed URLs for event images and host photos
       const imagePaths = events
-        .map(e => e.image_path)
+        .map(e => e.cover_image_path)
         .filter((p): p is string => !!p);
-      const creatorPhotoPaths = events
-        .flatMap(e => e.creator_profile?.photos?.map(p => p.storage_path) ?? [])
+      const hostPhotoPaths = events
+        .flatMap(e => e.host_profile?.photos?.map(p => p.storage_path) ?? [])
         .filter(Boolean);
-      const allPaths = [...imagePaths, ...creatorPhotoPaths];
+      const allPaths = [...imagePaths, ...hostPhotoPaths];
 
       const signedUrls = allPaths.length > 0 ? await getSignedPhotoUrls(allPaths) : new Map();
 
-      return events.map(event => ({
+      // Map events with signed URLs
+      const eventsWithUrls = events.map(event => ({
         ...event,
-        imageSignedUrl: event.image_path ? signedUrls.get(event.image_path) || null : null,
-        attendee_count: event.event_attendees?.filter(a => a.status === 'going').length ?? 0,
-        current_user_status: event.event_attendees?.find(a => a.user_id === user.id)?.status as 'going' | 'interested' | 'not_going' | null ?? null,
-        creator_profile: event.creator_profile ? {
-          ...event.creator_profile,
-          photos: event.creator_profile.photos?.map(photo => ({
+        coverImageSignedUrl: event.cover_image_path ? signedUrls.get(event.cover_image_path) || null : null,
+        current_user_status: event.event_rsvps?.find(a => a.user_id === user.id)?.status as EventWithHost['current_user_status'] ?? null,
+        host_profile: event.host_profile ? {
+          ...event.host_profile,
+          photos: event.host_profile.photos?.map(photo => ({
             ...photo,
             signedUrl: signedUrls.get(photo.storage_path) || undefined,
           })),
         } : undefined,
       }));
+
+      // Transform to app Event type
+      return transformEvents(eventsWithUrls as unknown as SupabaseEvent[]);
     },
     enabled: !!user,
   });
@@ -1052,7 +1084,7 @@ export function useEvent(eventId: string | undefined) {
   const { data: user } = useCurrentUser();
 
   return useQuery({
-    queryKey: ['event', eventId, user?.id, user],
+    queryKey: ['event', eventId, user?.id],
     queryFn: async () => {
       if (!eventId || !user) throw new Error('Event ID required');
 
@@ -1060,16 +1092,16 @@ export function useEvent(eventId: string | undefined) {
         .from('events')
         .select(`
           *,
-          creator_profile:profiles!events_created_by_fkey (
+          host_profile:profiles!events_host_id_fkey (
             user_id,
             display_name,
             photos (storage_path)
           ),
-          event_attendees (
+          event_rsvps (
             id,
             user_id,
             status,
-            attendee_profile:profiles!event_attendees_user_id_fkey (
+            attendee_profile:profiles!event_rsvps_user_id_fkey (
               display_name,
               photos (storage_path)
             )
@@ -1080,8 +1112,8 @@ export function useEvent(eventId: string | undefined) {
 
       if (error) throw error;
 
-      const event = data as unknown as EventWithDetails & {
-        event_attendees: Array<{
+      const event = data as unknown as EventWithHost & {
+        event_rsvps: Array<{
           id: string;
           user_id: string;
           status: string;
@@ -1091,18 +1123,17 @@ export function useEvent(eventId: string | undefined) {
 
       // Get signed URLs
       const allPaths = [
-        event.image_path,
-        ...(event.creator_profile?.photos?.map(p => p.storage_path) ?? []),
-        ...event.event_attendees.flatMap(a => a.attendee_profile?.photos?.map(p => p.storage_path) ?? []),
+        event.cover_image_path,
+        ...(event.host_profile?.photos?.map(p => p.storage_path) ?? []),
+        ...event.event_rsvps.flatMap(a => a.attendee_profile?.photos?.map(p => p.storage_path) ?? []),
       ].filter((p): p is string => !!p);
 
       const signedUrls = allPaths.length > 0 ? await getSignedPhotoUrls(allPaths) : new Map();
 
       return {
         ...event,
-        imageSignedUrl: event.image_path ? signedUrls.get(event.image_path) || null : null,
-        attendee_count: event.event_attendees?.filter(a => a.status === 'going').length ?? 0,
-        current_user_status: event.event_attendees?.find(a => a.user_id === user.id)?.status as 'going' | 'interested' | 'not_going' | null ?? null,
+        coverImageSignedUrl: event.cover_image_path ? signedUrls.get(event.cover_image_path) || null : null,
+        current_user_status: event.event_rsvps?.find(a => a.user_id === user.id)?.status as EventWithHost['current_user_status'] ?? null,
       };
     },
     enabled: !!eventId && !!user,
@@ -1120,27 +1151,50 @@ export function useCreateEvent() {
     mutationFn: async (input: {
       title: string;
       description: string;
-      location?: string;
-      event_date: string;
-      event_time?: string;
+      category: string;
+      tags?: string[];
+      location_name: string;
+      location_address?: string;
+      location_city: string;
+      location_latitude?: number;
+      location_longitude?: number;
+      is_virtual?: boolean;
+      virtual_link?: string;
+      start_date: string;
+      end_date?: string;
+      start_time: string;
+      end_time?: string;
       max_attendees?: number;
-      is_public?: boolean;
-      image_path?: string;
+      visibility?: 'public' | 'friends_only' | 'invite_only' | 'private';
+      requires_approval?: boolean;
+      cover_image_path?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
         .from('events')
         .insert({
-          created_by: user.id,
+          host_id: user.id,
           title: input.title,
           description: input.description,
-          location: input.location,
-          event_date: input.event_date,
-          event_time: input.event_time,
+          category: input.category,
+          tags: input.tags ?? [],
+          location_name: input.location_name,
+          location_address: input.location_address,
+          location_city: input.location_city,
+          location_latitude: input.location_latitude,
+          location_longitude: input.location_longitude,
+          is_virtual: input.is_virtual ?? false,
+          virtual_link: input.virtual_link,
+          start_date: input.start_date,
+          end_date: input.end_date,
+          start_time: input.start_time,
+          end_time: input.end_time,
           max_attendees: input.max_attendees,
-          is_public: input.is_public ?? true,
-          image_path: input.image_path,
+          visibility: input.visibility ?? 'public',
+          requires_approval: input.requires_approval ?? false,
+          cover_image_path: input.cover_image_path,
+          status: 'published',
         })
         .select()
         .single();
@@ -1155,19 +1209,19 @@ export function useCreateEvent() {
 }
 
 /**
- * Hook to update event attendance
+ * Hook to update event RSVP
  */
-export function useUpdateEventAttendance() {
+export function useUpdateEventRSVP() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
 
   return useMutation({
-    mutationFn: async (input: { eventId: string; status: 'going' | 'interested' | 'not_going' }) => {
+    mutationFn: async (input: { eventId: string; status: 'going' | 'maybe' | 'not_going' | 'waitlist' }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Check if attendance record exists
+      // Check if RSVP record exists
       const { data: existing } = await supabase
-        .from('event_attendees')
+        .from('event_rsvps')
         .select('id')
         .eq('event_id', input.eventId)
         .eq('user_id', user.id)
@@ -1176,7 +1230,7 @@ export function useUpdateEventAttendance() {
       if (existing) {
         // Update existing
         const { data, error } = await supabase
-          .from('event_attendees')
+          .from('event_rsvps')
           .update({ status: input.status })
           .eq('id', existing.id)
           .select()
@@ -1186,7 +1240,7 @@ export function useUpdateEventAttendance() {
       } else {
         // Insert new
         const { data, error } = await supabase
-          .from('event_attendees')
+          .from('event_rsvps')
           .insert({
             event_id: input.eventId,
             user_id: user.id,
@@ -1319,16 +1373,12 @@ export function useDiscoverProfiles() {
         })),
       }));
 
-      // Filter to only show profiles with at least one visible photo
-      const profilesWithPhotos = profilesWithUrls.filter((profile) => {
-        const hasVisiblePhoto = profile.photos?.some((photo) => photo.signedUrl);
-        if (!hasVisiblePhoto) {
-          console.log(`[Discover] Filtering out ${profile.display_name} - no visible photos`);
-        }
-        return hasVisiblePhoto;
-      });
+      // For development: show all profiles, even without photos
+      // In production, you may want to filter to profiles with photos:
+      // const profilesWithPhotos = profilesWithUrls.filter(p => p.photos?.some(photo => photo.signedUrl));
+      const profilesWithPhotos = profilesWithUrls;
 
-      console.log(`[Discover] Profiles with visible photos: ${profilesWithPhotos.length}`);
+      console.log(`[Discover] Profiles to display: ${profilesWithPhotos.length}`);
 
       // Transform Supabase profiles to App Profile type
       const transformedProfiles = transformProfiles(profilesWithPhotos as unknown as SupabaseProfile[]);

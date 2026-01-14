@@ -31,7 +31,7 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react-native';
-import useDatingStore from '@/lib/state/dating-store';
+import { useEvents } from '@/lib/supabase/hooks';
 import { EVENT_CATEGORIES } from '@/lib/mock-events';
 import { EventCategory } from '@/lib/types';
 import EventCard from '@/components/EventCard';
@@ -40,7 +40,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function EventsScreen() {
   const router = useRouter();
-  const events = useDatingStore((s) => s.events);
+  const { data: events = [], isLoading, refetch } = useEvents();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<EventCategory | null>(null);
@@ -67,7 +67,7 @@ export default function EventsScreen() {
           return (
             e.title.toLowerCase().includes(query) ||
             e.description.toLowerCase().includes(query) ||
-            e.tags.some((t) => t.toLowerCase().includes(query)) ||
+            (e.tags || []).some((t) => t.toLowerCase().includes(query)) ||
             e.location.city.toLowerCase().includes(query)
           );
         }
@@ -79,11 +79,11 @@ export default function EventsScreen() {
       );
   }, [events, selectedCategory, searchQuery]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const handleEventPress = (eventId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
