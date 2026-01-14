@@ -428,66 +428,6 @@ export interface Database {
           updated_at?: string;
         };
       };
-      events: {
-        Row: {
-          id: string; // UUID
-          created_by: string; // UUID - FK to users
-          title: string;
-          description: string;
-          location: string | null;
-          event_date: string;
-          event_time: string | null;
-          max_attendees: number | null;
-          is_public: boolean;
-          image_path: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          created_by: string;
-          title: string;
-          description: string;
-          location?: string | null;
-          event_date: string;
-          event_time?: string | null;
-          max_attendees?: number | null;
-          is_public?: boolean;
-          image_path?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          title?: string;
-          description?: string;
-          location?: string | null;
-          event_date?: string;
-          event_time?: string | null;
-          max_attendees?: number | null;
-          is_public?: boolean;
-          image_path?: string | null;
-          updated_at?: string;
-        };
-      };
-      event_attendees: {
-        Row: {
-          id: string; // UUID
-          event_id: string; // UUID - FK to events
-          user_id: string; // UUID - FK to users
-          status: 'going' | 'interested' | 'not_going';
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          event_id: string;
-          user_id: string;
-          status?: 'going' | 'interested' | 'not_going';
-          created_at?: string;
-        };
-        Update: {
-          status?: 'going' | 'interested' | 'not_going';
-        };
-      };
       trust_scores: {
         Row: {
           id: string; // UUID
