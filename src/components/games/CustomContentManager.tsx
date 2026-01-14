@@ -6,6 +6,7 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, SlideInRight } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,8 +24,12 @@ import {
   Check,
 } from 'lucide-react-native';
 import { GameType, TruthOrDareDifficulty } from '@/lib/types';
-import useDatingStore from '@/lib/state/dating-store';
 import { cn } from '@/lib/cn';
+import {
+  useMyCustomContent,
+  useCreateCustomContent,
+  useDeleteCustomContent,
+} from '@/lib/supabase/hooks';
 
 interface CustomContentManagerProps {
   visible: boolean;
@@ -71,16 +76,10 @@ export default function CustomContentManager({
   // Story Chain form state
   const [storyCategory, setStoryCategory] = useState<typeof STORY_CATEGORIES[number]>('romantic');
 
-  // Store
-  const customChallenges = useDatingStore((s) => s.customChallenges);
-  const customQuestions = useDatingStore((s) => s.customQuestions);
-  const customPrompts = useDatingStore((s) => s.customPrompts);
-  const addCustomChallenge = useDatingStore((s) => s.addCustomChallenge);
-  const removeCustomChallenge = useDatingStore((s) => s.removeCustomChallenge);
-  const addCustomQuestion = useDatingStore((s) => s.addCustomQuestion);
-  const removeCustomQuestion = useDatingStore((s) => s.removeCustomQuestion);
-  const addCustomPrompt = useDatingStore((s) => s.addCustomPrompt);
-  const removeCustomPrompt = useDatingStore((s) => s.removeCustomPrompt);
+  // Supabase hooks
+  const { data: customContent = [], isLoading } = useMyCustomContent(activeTab);
+  const createContentMutation = useCreateCustomContent();
+  const deleteContentMutation = useDeleteCustomContent();
 
   const resetForm = () => {
     setContent('');
@@ -91,51 +90,54 @@ export default function CustomContentManager({
     setStoryCategory('romantic');
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!content.trim()) return;
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    if (activeTab === 'truth_or_dare') {
-      addCustomChallenge({
-        type: challengeType,
-        difficulty,
-        content: content.trim(),
-        for_couples: forCouples,
-        timer_seconds: 60,
-      });
-    } else if (activeTab === 'hot_seat') {
-      addCustomQuestion({
-        question: content.trim(),
-        category: questionCategory,
-      });
-    } else if (activeTab === 'story_chain') {
-      addCustomPrompt({
-        category: storyCategory,
-        prompt: content.trim(),
-      });
-    }
+    try {
+      if (activeTab === 'truth_or_dare') {
+        await createContentMutation.mutateAsync({
+          gameType: 'truth_or_dare',
+          contentType: challengeType,
+          content: content.trim(),
+          difficulty,
+          forCouples,
+          forSingles: !forCouples,
+        });
+      } else if (activeTab === 'hot_seat') {
+        await createContentMutation.mutateAsync({
+          gameType: 'hot_seat',
+          contentType: 'question',
+          content: content.trim(),
+          category: questionCategory,
+        });
+      } else if (activeTab === 'story_chain') {
+        await createContentMutation.mutateAsync({
+          gameType: 'story_chain',
+          contentType: 'prompt',
+          content: content.trim(),
+          theme: storyCategory,
+        });
+      }
 
-    resetForm();
-    setShowAddForm(false);
+      resetForm();
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error adding custom content:', error);
+      // TODO: Show error toast
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (activeTab === 'truth_or_dare') {
-      removeCustomChallenge(id);
-    } else if (activeTab === 'hot_seat') {
-      removeCustomQuestion(id);
-    } else if (activeTab === 'story_chain') {
-      removeCustomPrompt(id);
+    try {
+      await deleteContentMutation.mutateAsync(id);
+    } catch (error) {
+      console.error('Error deleting custom content:', error);
+      // TODO: Show error toast
     }
-  };
-
-  const getContentList = () => {
-    if (activeTab === 'truth_or_dare') return customChallenges;
-    if (activeTab === 'hot_seat') return customQuestions;
-    return customPrompts;
   };
 
   const renderAddForm = () => {
@@ -345,8 +347,6 @@ export default function CustomContentManager({
     );
   };
 
-  const contentList = getContentList();
-
   return (
     <Modal
       visible={visible}
@@ -418,16 +418,23 @@ export default function CustomContentManager({
               </Pressable>
               <Pressable
                 onPress={handleAdd}
-                disabled={!content.trim()}
-                className={cn('flex-1 rounded-xl overflow-hidden', !content.trim() && 'opacity-50')}
+                disabled={!content.trim() || createContentMutation.isPending}
+                className={cn(
+                  'flex-1 rounded-xl overflow-hidden',
+                  (!content.trim() || createContentMutation.isPending) && 'opacity-50'
+                )}
               >
                 <LinearGradient
                   colors={['#9333ea', '#db2777']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={{ paddingVertical: 16, alignItems: 'center' }}
+                  style={{ paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
                 >
-                  <Text className="text-white font-semibold">Add</Text>
+                  {createContentMutation.isPending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-white font-semibold">Add</Text>
+                  )}
                 </LinearGradient>
               </Pressable>
             </View>
@@ -436,7 +443,11 @@ export default function CustomContentManager({
           <>
             {/* Content List */}
             <ScrollView className="flex-1 px-5 py-4">
-              {contentList.length === 0 ? (
+              {isLoading ? (
+                <View className="items-center py-12">
+                  <ActivityIndicator size="large" color="#9333ea" />
+                </View>
+              ) : customContent.length === 0 ? (
                 <Animated.View
                   entering={FadeIn}
                   className="items-center py-12"
@@ -450,49 +461,41 @@ export default function CustomContentManager({
                     No custom {activeTab.replace(/_/g, ' ')} content yet.
                   </Text>
                   <Text className="text-gray-500 text-sm text-center mt-1">
-                    Add your own questions," challenges, or prompts!
+                    Add your own questions, challenges, or prompts!
                   </Text>
                 </Animated.View>
               ) : (
-                contentList.map((item, index) => (
+                customContent.map((item, index) => (
                   <Animated.View
                     key={item.id}
                     entering={SlideInRight.delay(index * 50)}
                     className="bg-zinc-900 rounded-xl p-4 mb-3 flex-row items-start"
                   >
                     <View className="flex-1 mr-3">
-                      {'content' in item && (
-                        <Text className="text-white">{item.content}</Text>
-                      )}
-                      {'question' in item && (
-                        <Text className="text-white">{item.question}</Text>
-                      )}
-                      {'prompt' in item && (
-                        <Text className="text-white">{item.prompt}</Text>
-                      )}
+                      <Text className="text-white">{item.content}</Text>
                       <View className="flex-row mt-2 gap-2">
-                        {'type' in item && (
+                        {item.content_type && (
                           <View className="bg-zinc-800 px-2 py-1 rounded">
                             <Text className="text-gray-500 text-xs capitalize">
-                              {item.type}
+                              {item.content_type}
                             </Text>
                           </View>
                         )}
-                        {'difficulty' in item && (
+                        {item.difficulty && (
                           <View className="bg-zinc-800 px-2 py-1 rounded">
                             <Text className="text-gray-500 text-xs capitalize">
                               {item.difficulty}
                             </Text>
                           </View>
                         )}
-                        {'category' in item && (
+                        {item.category && (
                           <View className="bg-zinc-800 px-2 py-1 rounded">
                             <Text className="text-gray-500 text-xs capitalize">
                               {item.category}
                             </Text>
                           </View>
                         )}
-                        {'for_couples' in item && item.for_couples && (
+                        {item.for_couples && (
                           <View className="bg-pink-500/20 px-2 py-1 rounded">
                             <Text className="text-pink-400 text-xs">Couples</Text>
                           </View>
@@ -502,8 +505,13 @@ export default function CustomContentManager({
                     <Pressable
                       onPress={() => handleDelete(item.id)}
                       className="w-10 h-10 bg-red-500/10 rounded-full items-center justify-center"
+                      disabled={deleteContentMutation.isPending}
                     >
-                      <Trash2 size={18} color="#ef4444" />
+                      {deleteContentMutation.isPending ? (
+                        <ActivityIndicator size="small" color="#ef4444" />
+                      ) : (
+                        <Trash2 size={18} color="#ef4444" />
+                      )}
                     </Pressable>
                   </Animated.View>
                 ))
