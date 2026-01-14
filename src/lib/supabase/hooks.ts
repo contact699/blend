@@ -1945,3 +1945,124 @@ export function useRefreshTasteProfile() {
     },
   });
 }
+
+/**
+ * Hook to get nearby profiles within a radius
+ * Uses Haversine formula to calculate distance
+ */
+export function useNearbyProfiles(
+  latitude: number | undefined,
+  longitude: number | undefined,
+  radiusMiles: number = 25
+) {
+  const { data: user } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['nearby-profiles', latitude, longitude, radiusMiles],
+    queryFn: async () => {
+      if (!user || !latitude || !longitude) return [];
+
+      // Fetch all profiles that have location data and show_on_map enabled
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          user_id,
+          display_name,
+          age,
+          city,
+          bio,
+          latitude,
+          longitude,
+          show_on_map,
+          pace_preference,
+          no_photos,
+          open_to_meet,
+          virtual_only,
+          response_style,
+          voice_intro_url
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .eq('show_on_map', true)
+        .neq('user_id', user.id); // Exclude current user
+
+      if (error) throw error;
+
+      // Calculate distance for each profile and filter by radius
+      const nearbyProfiles = profiles
+        ?.map((profile: any) => {
+          const distance = calculateDistance(
+            latitude,
+            longitude,
+            profile.latitude,
+            profile.longitude
+          );
+          return { ...profile, distance };
+        })
+        .filter((profile: any) => profile.distance <= radiusMiles)
+        .sort((a: any, b: any) => a.distance - b.distance) || [];
+
+      return nearbyProfiles;
+    },
+    enabled: !!user && !!latitude && !!longitude,
+  });
+}
+
+/**
+ * Hook to get nearby events within a radius
+ */
+export function useNearbyEvents(
+  latitude: number | undefined,
+  longitude: number | undefined,
+  radiusMiles: number = 25
+) {
+  const { data: user } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['nearby-events', latitude, longitude, radiusMiles],
+    queryFn: async () => {
+      if (!user || !latitude || !longitude) return [];
+
+      // Note: Events table structure may vary - adjust as needed
+      // This is a placeholder implementation
+      // In production, you'd fetch events from the events table
+      // with location data and calculate distances
+
+      // For now, return empty array as events are using mock data
+      return [];
+    },
+    enabled: !!user && !!latitude && !!longitude,
+  });
+}
+
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ * Returns distance in miles
+ */
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance;
+}
+
+function toRad(degrees: number): number {
+  return degrees * (Math.PI / 180);
+}
