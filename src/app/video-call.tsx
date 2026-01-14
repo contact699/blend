@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Platform, Image } from 'react-native';
+import { View, Text, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInUp, useAnimatedStyle, withRepeat, withTiming, useSharedValue } from 'react-native-reanimated';
 import * as ScreenCapture from 'expo-screen-capture';
 import {
-  Phone,
   PhoneOff,
   Mic,
   MicOff,
@@ -17,15 +16,17 @@ import {
   EyeOff,
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
-import { MOCK_PROFILES } from '@/lib/mock-data';
-import { Profile } from '@/lib/types';
+import { webRTCService, RTCView } from '@/lib/webrtc/webrtc-service';
+import type { MediaStream } from 'react-native-webrtc';
 
 export default function VideoCallScreen() {
-  const { threadId, participantId, participantName, participantPhoto } = useLocalSearchParams<{
+  const { threadId, participantId, participantName, callId, isAnswering, offerSdp } = useLocalSearchParams<{
     threadId: string;
     participantId: string;
     participantName: string;
-    participantPhoto: string;
+    callId?: string;
+    isAnswering?: string;
+    offerSdp?: string;
   }>();
   const router = useRouter();
 
@@ -35,9 +36,13 @@ export default function VideoCallScreen() {
   const [callState, setCallState] = useState<'connecting' | 'connected' | 'ended'>('connecting');
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [connectionState, setConnectionState] = useState<string>('new');
+
   const callStartTime = useRef<number | null>(null);
+  const activeCallId = useRef<string | null>(null);
 
   // Pulse animation for connecting state
   const pulseScale = useSharedValue(1);
@@ -54,7 +59,7 @@ export default function VideoCallScreen() {
     transform: [{ scale: pulseScale.value }],
   }));
 
-  // Screenshot protection - prevent recording during call (only on native)
+  // Screenshot protection
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
@@ -73,15 +78,66 @@ export default function VideoCallScreen() {
     };
   }, []);
 
-  // Simulate connection after 2 seconds
+  // Initialize call
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setCallState('connected');
-      callStartTime.current = Date.now();
-    }, 2000);
+    initializeCall();
 
-    return () => clearTimeout(timer);
+    return () => {
+      // Cleanup on unmount
+      webRTCService.endCall();
+    };
   }, []);
+
+  const initializeCall = async () => {
+    try {
+      // Set up event listeners
+      webRTCService.onLocalStream((stream: MediaStream) => {
+        setLocalStream(stream);
+      });
+
+      webRTCService.onRemoteStream((stream: MediaStream) => {
+        setRemoteStream(stream);
+        setCallState('connected');
+        callStartTime.current = Date.now();
+      });
+
+      webRTCService.onCallEnded(() => {
+        handleCallEnded();
+      });
+
+      webRTCService.onConnectionStateChange((state: string) => {
+        setConnectionState(state);
+        if (state === 'connected') {
+          setCallState('connected');
+          if (!callStartTime.current) {
+            callStartTime.current = Date.now();
+          }
+        }
+      });
+
+      if (isAnswering === 'true' && callId && offerSdp) {
+        // Answer incoming call
+        const offer = JSON.parse(offerSdp);
+        await webRTCService.answerCall(
+          currentUserId,
+          participantId,
+          callId,
+          offer
+        );
+        activeCallId.current = callId;
+      } else {
+        // Start new call
+        const newCallId = await webRTCService.startCall(
+          currentUserId,
+          participantId
+        );
+        activeCallId.current = newCallId;
+      }
+    } catch (error) {
+      console.error('Error initializing call:', error);
+      setCallState('ended');
+    }
+  };
 
   // Call duration timer
   useEffect(() => {
@@ -102,7 +158,7 @@ export default function VideoCallScreen() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleEndCall = () => {
+  const handleCallEnded = () => {
     setCallState('ended');
 
     // Log call in chat
@@ -111,7 +167,6 @@ export default function VideoCallScreen() {
         ? `Video call - ${formatDuration(callDuration)}`
         : 'Missed video call';
 
-      // We'll add a system message about the call
       sendMessage(threadId, durationText, false, 'video_call');
     }
 
@@ -121,12 +176,29 @@ export default function VideoCallScreen() {
       } else {
         router.replace('/(tabs)/inbox');
       }
-    }, 500);
+    }, 1000);
   };
 
-  const profile = MOCK_PROFILES.find((p: Profile) => p.user_id === participantId);
-  const displayName = participantName || profile?.display_name || 'Unknown';
-  const displayPhoto = participantPhoto || profile?.photos[0];
+  const handleEndCall = async () => {
+    await webRTCService.endCall();
+    handleCallEnded();
+  };
+
+  const handleToggleMute = () => {
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    webRTCService.toggleAudio(newMutedState);
+  };
+
+  const handleToggleVideo = () => {
+    const newVideoState = !isVideoOff;
+    setIsVideoOff(newVideoState);
+    webRTCService.toggleVideo(!newVideoState);
+  };
+
+  const handleSwitchCamera = async () => {
+    await webRTCService.switchCamera();
+  };
 
   return (
     <View className="flex-1 bg-black">
@@ -134,17 +206,28 @@ export default function VideoCallScreen() {
         colors={['#1a0a1a', '#0d0d0d', '#0a0a14']}
         style={{ flex: 1 }}
       >
-        {/* Simulated remote video (show participant photo as placeholder) */}
+        {/* Remote video (full screen) */}
         <View className="flex-1">
-          {displayPhoto && (
-            <Image
-              source={{ uri: displayPhoto }}
-              className="absolute inset-0 w-full h-full"
-              resizeMode="cover"
-              blurRadius={isVideoOff ? 20 : 0}
+          {remoteStream ? (
+            <RTCView
+              streamURL={remoteStream.toURL()}
+              style={{ flex: 1 }}
+              objectFit="cover"
+              mirror={false}
             />
+          ) : (
+            <View className="flex-1 items-center justify-center">
+              <LinearGradient
+                colors={['#9333ea', '#db2777']}
+                style={{ width: 160, height: 160, borderRadius: 80, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text className="text-white text-5xl font-bold">
+                  {participantName?.charAt(0).toUpperCase() || '?'}
+                </Text>
+              </LinearGradient>
+            </View>
           )}
-          <View className="absolute inset-0 bg-black/40" />
+          <View className="absolute inset-0 bg-black/20" />
         </View>
 
         <SafeAreaView className="absolute inset-0">
@@ -161,26 +244,22 @@ export default function VideoCallScreen() {
               </Text>
             </View>
 
-            {/* Participant info */}
+            {/* Call status */}
             {callState === 'connecting' && (
               <Animated.View style={pulseStyle} className="items-center">
-                {displayPhoto && (
-                  <Image
-                    source={{ uri: displayPhoto }}
-                    className="w-32 h-32 rounded-full border-4 border-purple-500/50"
-                  />
-                )}
-                <Text className="text-white text-2xl font-semibold mt-4">
-                  {displayName}
+                <Text className="text-white text-2xl font-semibold">
+                  {participantName || 'Unknown'}
                 </Text>
-                <Text className="text-purple-300 text-lg mt-1">Connecting...</Text>
+                <Text className="text-purple-300 text-lg mt-1">
+                  {connectionState === 'new' ? 'Initializing...' : 'Connecting...'}
+                </Text>
               </Animated.View>
             )}
 
             {callState === 'connected' && (
               <View className="items-center">
                 <Text className="text-white text-xl font-semibold">
-                  {displayName}
+                  {participantName || 'Unknown'}
                 </Text>
                 <Text className="text-green-400 text-base mt-1">
                   {formatDuration(callDuration)}
@@ -200,18 +279,18 @@ export default function VideoCallScreen() {
             )}
           </Animated.View>
 
-          {/* Self view (picture-in-picture style) */}
-          {callState === 'connected' && !isVideoOff && (
+          {/* Self view (picture-in-picture) */}
+          {localStream && callState === 'connected' && !isVideoOff && (
             <Animated.View
               entering={FadeInUp.delay(500)}
-              className="absolute top-32 right-4 w-28 h-40 bg-zinc-900 rounded-2xl overflow-hidden border-2 border-purple-500/30"
+              className="absolute top-32 right-4 w-28 h-40 rounded-2xl overflow-hidden border-2 border-purple-500/30"
             >
-              <LinearGradient
-                colors={['#9333ea', '#db2777']}
-                style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Text className="text-white/60 text-xs">Your camera</Text>
-              </LinearGradient>
+              <RTCView
+                streamURL={localStream.toURL()}
+                style={{ flex: 1 }}
+                objectFit="cover"
+                mirror={true}
+              />
             </Animated.View>
           )}
 
@@ -232,7 +311,7 @@ export default function VideoCallScreen() {
             <View className="flex-row justify-center items-center space-x-4 px-6">
               {/* Mute */}
               <Pressable
-                onPress={() => setIsMuted(!isMuted)}
+                onPress={handleToggleMute}
                 className={`w-14 h-14 rounded-full items-center justify-center ${
                   isMuted ? 'bg-red-500' : 'bg-zinc-800'
                 }`}
@@ -246,7 +325,7 @@ export default function VideoCallScreen() {
 
               {/* Video toggle */}
               <Pressable
-                onPress={() => setIsVideoOff(!isVideoOff)}
+                onPress={handleToggleVideo}
                 className={`w-14 h-14 rounded-full items-center justify-center ml-4 ${
                   isVideoOff ? 'bg-red-500' : 'bg-zinc-800'
                 }`}
@@ -260,7 +339,7 @@ export default function VideoCallScreen() {
 
               {/* Flip camera */}
               <Pressable
-                onPress={() => setIsFrontCamera(!isFrontCamera)}
+                onPress={handleSwitchCamera}
                 className="w-14 h-14 rounded-full bg-zinc-800 items-center justify-center ml-4"
               >
                 <FlipHorizontal size={24} color="white" />
