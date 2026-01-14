@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, Image } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInDown, SlideInUp } from 'react-native-reanimated';
@@ -23,11 +23,14 @@ import { GameType, GameParticipant, Profile } from '@/lib/types';
 import { GAME_INFO } from '@/lib/game-content';
 import { cn } from '@/lib/cn';
 import CustomContentManager from './CustomContentManager';
+import { useStartGame, useCurrentProfile } from '@/lib/supabase/hooks';
+import { GameType as DbGameType } from '@/lib/supabase/types';
 
 interface GameLauncherProps {
   visible: boolean;
   onClose: () => void;
-  onStartGame: (gameType: GameType, participants: GameParticipant[]) => void;
+  onGameStarted?: (gameSessionId: string) => void;
+  threadId: string;
   participants: Profile[];
   currentUserId: string;
 }
@@ -53,12 +56,16 @@ const GAME_GRADIENTS = {
 export default function GameLauncher({
   visible,
   onClose,
-  onStartGame,
+  onGameStarted,
+  threadId,
   participants,
   currentUserId,
 }: GameLauncherProps) {
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const [showCustomContent, setShowCustomContent] = useState(false);
+  
+  const { data: currentProfile } = useCurrentProfile();
+  const startGameMutation = useStartGame();
 
   const totalParticipants = participants.length + 1; // +1 for current user
 
@@ -81,33 +88,54 @@ export default function GameLauncher({
     setSelectedGame(gameType);
   };
 
-  const handleStartGame = () => {
-    if (!selectedGame) return;
+  const handleStartGame = async () => {
+    if (!selectedGame || !currentProfile?.id) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Create participants array including current user
-    const gameParticipants: GameParticipant[] = [
-      {
-        user_id: currentUserId,
-        display_name: 'You',
-        score: 0,
-        skips_used: 0,
-        turns_taken: 0,
-      },
-      ...participants.map((p) => ({
-        user_id: p.user_id,
-        display_name: p.display_name,
-        photo: p.photos[0],
-        score: 0,
-        skips_used: 0,
-        turns_taken: 0,
-      })),
-    ];
+    try {
+      // Build turn order with profile IDs
+      const turnOrder = [
+        currentProfile.id,
+        ...participants.map((p) => p.id),
+      ];
 
-    onStartGame(selectedGame, gameParticipants);
-    setSelectedGame(null);
-    onClose();
+      // Build game config based on game type
+      let config: Record<string, unknown> = {};
+      if (selectedGame === 'truth_or_dare') {
+        config = {
+          difficulty: 'playful',
+          allowSkips: true,
+        };
+      } else if (selectedGame === 'hot_seat') {
+        config = {
+          questionTimeLimit: 30,
+          hotSeatDuration: 300,
+        };
+      } else if (selectedGame === 'story_chain') {
+        config = {
+          theme: 'romantic',
+          sentenceLimit: 2,
+        };
+      }
+
+      const gameSession = await startGameMutation.mutateAsync({
+        threadId,
+        gameType: selectedGame as DbGameType,
+        config,
+        turnOrder,
+      });
+
+      if (onGameStarted) {
+        onGameStarted(gameSession.id);
+      }
+
+      setSelectedGame(null);
+      onClose();
+    } catch (error) {
+      console.error('Error starting game:', error);
+      // TODO: Show error toast
+    }
   };
 
   const handleClose = () => {
@@ -309,7 +337,7 @@ export default function GameLauncher({
               entering={SlideInUp.springify()}
               className="absolute bottom-0 left-0 right-0 p-5 pb-8"
             >
-              <Pressable onPress={handleStartGame}>
+              <Pressable onPress={handleStartGame} disabled={startGameMutation.isPending}>
                 <LinearGradient
                   colors={[...GAME_GRADIENTS[selectedGame]]}
                   start={{ x: 0, y: 0 }}
@@ -320,12 +348,19 @@ export default function GameLauncher({
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    opacity: startGameMutation.isPending ? 0.6 : 1,
                   }}
                 >
-                  <Play size={20} color="white" fill="white" />
-                  <Text className="text-white font-bold text-lg ml-2">
-                    Start {GAME_INFO[selectedGame].name}
-                  </Text>
+                  {startGameMutation.isPending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <>
+                      <Play size={20} color="white" fill="white" />
+                      <Text className="text-white font-bold text-lg ml-2">
+                        Start {GAME_INFO[selectedGame].name}
+                      </Text>
+                    </>
+                  )}
                 </LinearGradient>
               </Pressable>
             </Animated.View>
