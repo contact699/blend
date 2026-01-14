@@ -8,7 +8,7 @@
       "node": "20.18.0",
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EAS_BUILD_INSTALL_COMMAND": "npm ci --legacy-peer-deps"
+        "EAS_BUILD_INSTALL_COMMAND": "npm install --legacy-peer-deps"
       }
     },
     "development": {
