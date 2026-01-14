@@ -1945,3 +1945,760 @@ export function useRefreshTasteProfile() {
     },
   });
 }
+
+// ============================================================================
+// EVENT HOOKS
+// ============================================================================
+
+import {
+  DbEvent,
+  DbEventRsvp,
+  EventWithHost,
+  EventWithRsvps,
+} from './types';
+import {
+  createEventSchema,
+  updateEventSchema,
+  createRsvpSchema,
+  updateRsvpSchema,
+  uuidSchema as eventUuidSchema,
+} from '../validation';
+import {
+  secureEventPhotoUpload,
+  getSignedEventPhotoUrl,
+} from './event-photos';
+
+/**
+ * Hook to fetch events with optional filters
+ */
+export function useEvents(filters?: {
+  category?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  const { data: currentUser } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['events', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('events')
+        .select(`
+          *,
+          host:users!events_host_id_fkey(id, profiles(id, user_id, display_name))
+        `)
+        .is('cancelled_at', null)
+        .gte('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true });
+
+      // Apply filters
+      if (filters?.category) {
+        query = query.eq('category', filters.category);
+      }
+      if (filters?.startDate) {
+        query = query.gte('start_time', filters.startDate);
+      }
+      if (filters?.endDate) {
+        query = query.lte('start_time', filters.endDate);
+      }
+
+      const { data: events, error } = await query;
+
+      if (error) throw error;
+
+      // Fetch RSVP counts and user's RSVP for each event
+      const eventsWithDetails: EventWithHost[] = await Promise.all(
+        (events || []).map(async (event) => {
+          // Get RSVP counts
+          const { data: rsvps } = await supabase
+            .from('event_rsvps')
+            .select('status, user_id')
+            .eq('event_id', event.id);
+
+          const rsvpCounts = {
+            going: rsvps?.filter(r => r.status === 'going').length || 0,
+            maybe: rsvps?.filter(r => r.status === 'maybe').length || 0,
+            waitlist: rsvps?.filter(r => r.status === 'waitlist').length || 0,
+            pending: rsvps?.filter(r => r.status === 'pending').length || 0,
+          };
+
+          // Get user's RSVP if authenticated
+          const userRsvp = currentUser
+            ? rsvps?.find(r => r.user_id === currentUser.id)
+            : null;
+
+          // Get signed URL for cover photo if exists
+          let coverPhotoUrl = event.cover_photo_url;
+          if (coverPhotoUrl && coverPhotoUrl.startsWith('event-photos/')) {
+            const signedUrl = await getSignedEventPhotoUrl(coverPhotoUrl);
+            coverPhotoUrl = signedUrl || coverPhotoUrl;
+          }
+
+          return {
+            ...event,
+            cover_photo_url: coverPhotoUrl,
+            host: (event as any).host?.profiles?.[0] || null,
+            rsvp_counts: rsvpCounts,
+            user_rsvp: userRsvp ? { ...userRsvp, event_id: event.id } as DbEventRsvp : null,
+          };
+        })
+      );
+
+      return eventsWithDetails;
+    },
+    enabled: true,
+  });
+}
+
+/**
+ * Hook to fetch a single event by ID
+ */
+export function useEvent(eventId: string | undefined) {
+  const { data: currentUser } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['event', eventId, currentUser?.id],
+    queryFn: async () => {
+      if (!eventId) throw new Error('Event ID required');
+      validateOrThrow(eventUuidSchema, eventId);
+
+      const { data: event, error } = await supabase
+        .from('events')
+        .select(`
+          *,
+          host:users!events_host_id_fkey(id, profiles(id, user_id, display_name))
+        `)
+        .eq('id', eventId)
+        .single();
+
+      if (error) throw error;
+
+      // Get RSVP counts
+      const { data: rsvps } = await supabase
+        .from('event_rsvps')
+        .select('status, user_id')
+        .eq('event_id', event.id);
+
+      const rsvpCounts = {
+        going: rsvps?.filter(r => r.status === 'going').length || 0,
+        maybe: rsvps?.filter(r => r.status === 'maybe').length || 0,
+        waitlist: rsvps?.filter(r => r.status === 'waitlist').length || 0,
+        pending: rsvps?.filter(r => r.status === 'pending').length || 0,
+      };
+
+      // Get user's RSVP if authenticated
+      const userRsvp = currentUser
+        ? rsvps?.find(r => r.user_id === currentUser.id)
+        : null;
+
+      // Get signed URL for cover photo if exists
+      let coverPhotoUrl = event.cover_photo_url;
+      if (coverPhotoUrl && coverPhotoUrl.startsWith('event-photos/')) {
+        const signedUrl = await getSignedEventPhotoUrl(coverPhotoUrl);
+        coverPhotoUrl = signedUrl || coverPhotoUrl;
+      }
+
+      return {
+        ...event,
+        cover_photo_url: coverPhotoUrl,
+        host: (event as any).host?.profiles?.[0] || null,
+        rsvp_counts: rsvpCounts,
+        user_rsvp: userRsvp ? { ...userRsvp, event_id: event.id } as DbEventRsvp : null,
+      } as EventWithHost;
+    },
+    enabled: !!eventId,
+  });
+}
+
+/**
+ * Hook to fetch events hosted by current user
+ */
+export function useMyEvents() {
+  const { data: user } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['my-events', user?.id],
+    queryFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: events, error } = await supabase
+        .from('events')
+        .select(`
+          *,
+          host:users!events_host_id_fkey(id, profiles(id, user_id, display_name))
+        `)
+        .eq('host_id', user.id)
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+
+      // Fetch RSVP counts for each event
+      const eventsWithDetails: EventWithHost[] = await Promise.all(
+        (events || []).map(async (event) => {
+          const { data: rsvps } = await supabase
+            .from('event_rsvps')
+            .select('status')
+            .eq('event_id', event.id);
+
+          const rsvpCounts = {
+            going: rsvps?.filter(r => r.status === 'going').length || 0,
+            maybe: rsvps?.filter(r => r.status === 'maybe').length || 0,
+            waitlist: rsvps?.filter(r => r.status === 'waitlist').length || 0,
+            pending: rsvps?.filter(r => r.status === 'pending').length || 0,
+          };
+
+          // Get signed URL for cover photo if exists
+          let coverPhotoUrl = event.cover_photo_url;
+          if (coverPhotoUrl && coverPhotoUrl.startsWith('event-photos/')) {
+            const signedUrl = await getSignedEventPhotoUrl(coverPhotoUrl);
+            coverPhotoUrl = signedUrl || coverPhotoUrl;
+          }
+
+          return {
+            ...event,
+            cover_photo_url: coverPhotoUrl,
+            host: (event as any).host?.profiles?.[0] || null,
+            rsvp_counts: rsvpCounts,
+            user_rsvp: null,
+          };
+        })
+      );
+
+      return eventsWithDetails;
+    },
+    enabled: !!user,
+  });
+}
+
+/**
+ * Hook to fetch events user has RSVP'd to
+ */
+export function useMyRsvps() {
+  const { data: user } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['my-rsvps', user?.id],
+    queryFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: rsvps, error } = await supabase
+        .from('event_rsvps')
+        .select(`
+          *,
+          event:events(
+            *,
+            host:users!events_host_id_fkey(id, profiles(id, user_id, display_name))
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform to include event details
+      const eventsWithRsvps: EventWithHost[] = await Promise.all(
+        (rsvps || []).map(async (rsvp) => {
+          const event = (rsvp as any).event;
+          
+          // Get RSVP counts
+          const { data: allRsvps } = await supabase
+            .from('event_rsvps')
+            .select('status')
+            .eq('event_id', event.id);
+
+          const rsvpCounts = {
+            going: allRsvps?.filter(r => r.status === 'going').length || 0,
+            maybe: allRsvps?.filter(r => r.status === 'maybe').length || 0,
+            waitlist: allRsvps?.filter(r => r.status === 'waitlist').length || 0,
+            pending: allRsvps?.filter(r => r.status === 'pending').length || 0,
+          };
+
+          // Get signed URL for cover photo if exists
+          let coverPhotoUrl = event.cover_photo_url;
+          if (coverPhotoUrl && coverPhotoUrl.startsWith('event-photos/')) {
+            const signedUrl = await getSignedEventPhotoUrl(coverPhotoUrl);
+            coverPhotoUrl = signedUrl || coverPhotoUrl;
+          }
+
+          return {
+            ...event,
+            cover_photo_url: coverPhotoUrl,
+            host: event.host?.profiles?.[0] || null,
+            rsvp_counts: rsvpCounts,
+            user_rsvp: rsvp as DbEventRsvp,
+          };
+        })
+      );
+
+      return eventsWithRsvps;
+    },
+    enabled: !!user,
+  });
+}
+
+/**
+ * Hook to fetch attendees for an event (for hosts)
+ */
+export function useEventAttendees(eventId: string | undefined) {
+  const { data: user } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['event-attendees', eventId],
+    queryFn: async () => {
+      if (!eventId) throw new Error('Event ID required');
+      validateOrThrow(eventUuidSchema, eventId);
+
+      // Verify user is the host
+      const { data: event } = await supabase
+        .from('events')
+        .select('host_id')
+        .eq('id', eventId)
+        .single();
+
+      if (!event || event.host_id !== user?.id) {
+        throw new Error('Unauthorized: Only event host can view attendees');
+      }
+
+      const { data: rsvps, error } = await supabase
+        .from('event_rsvps')
+        .select(`
+          *,
+          user:users!event_rsvps_user_id_fkey(
+            id,
+            profiles(id, user_id, display_name)
+          )
+        `)
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      return rsvps?.map(rsvp => ({
+        ...rsvp,
+        user: (rsvp as any).user?.profiles?.[0] || null,
+      })) || [];
+    },
+    enabled: !!eventId && !!user,
+  });
+}
+
+/**
+ * Hook to create a new event
+ */
+export function useCreateEvent() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async (eventData: {
+      title: string;
+      description?: string;
+      category: string;
+      coverPhotoUri?: string;
+      location?: string;
+      meeting_link?: string;
+      start_time: string;
+      end_time: string;
+      timezone?: string;
+      max_attendees?: number | null;
+      visibility?: 'public' | 'friends_only' | 'invite_only';
+      requires_approval?: boolean;
+      tags?: string[];
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Upload cover photo if provided
+      let coverPhotoUrl: string | null = null;
+      if (eventData.coverPhotoUri) {
+        const result = await secureEventPhotoUpload(user.id, eventData.coverPhotoUri);
+        if (!result.success || !result.path) {
+          throw new Error(result.error ?? 'Photo upload failed');
+        }
+        coverPhotoUrl = result.path;
+      }
+
+      // Validate event data
+      const validatedData = validateOrThrow(createEventSchema, {
+        ...eventData,
+        cover_photo_url: coverPhotoUrl,
+      });
+
+      // Create event
+      const { data: event, error } = await supabase
+        .from('events')
+        .insert({
+          host_id: user.id,
+          title: validatedData.title,
+          description: validatedData.description,
+          category: validatedData.category,
+          cover_photo_url: coverPhotoUrl,
+          location: validatedData.location,
+          meeting_link: validatedData.meeting_link,
+          start_time: validatedData.start_time,
+          end_time: validatedData.end_time,
+          timezone: validatedData.timezone,
+          max_attendees: validatedData.max_attendees,
+          visibility: validatedData.visibility,
+          requires_approval: validatedData.requires_approval,
+          tags: validatedData.tags,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return event as DbEvent;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['my-events'] });
+    },
+  });
+}
+
+/**
+ * Hook to update an event
+ */
+export function useUpdateEvent() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async ({
+      eventId,
+      updates,
+      coverPhotoUri,
+    }: {
+      eventId: string;
+      updates: Partial<DbEvent>;
+      coverPhotoUri?: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      validateOrThrow(eventUuidSchema, eventId);
+
+      // Verify user is the host
+      const { data: event } = await supabase
+        .from('events')
+        .select('host_id')
+        .eq('id', eventId)
+        .single();
+
+      if (!event || event.host_id !== user.id) {
+        throw new Error('Unauthorized: Only event host can update');
+      }
+
+      // Upload new cover photo if provided
+      let coverPhotoUrl = updates.cover_photo_url;
+      if (coverPhotoUri) {
+        const result = await secureEventPhotoUpload(user.id, coverPhotoUri);
+        if (!result.success || !result.path) {
+          throw new Error(result.error ?? 'Photo upload failed');
+        }
+        coverPhotoUrl = result.path;
+      }
+
+      // Validate updates
+      const validatedUpdates = validateOrThrow(updateEventSchema, {
+        ...updates,
+        cover_photo_url: coverPhotoUrl,
+      });
+
+      const { data: updatedEvent, error } = await supabase
+        .from('events')
+        .update(validatedUpdates)
+        .eq('id', eventId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return updatedEvent as DbEvent;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['my-events'] });
+    },
+  });
+}
+
+/**
+ * Hook to cancel an event (soft delete)
+ */
+export function useCancelEvent() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      if (!user) throw new Error('Not authenticated');
+      validateOrThrow(eventUuidSchema, eventId);
+
+      // Verify user is the host
+      const { data: event } = await supabase
+        .from('events')
+        .select('host_id')
+        .eq('id', eventId)
+        .single();
+
+      if (!event || event.host_id !== user.id) {
+        throw new Error('Unauthorized: Only event host can cancel');
+      }
+
+      const { error } = await supabase
+        .from('events')
+        .update({ cancelled_at: new Date().toISOString() })
+        .eq('id', eventId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+    onSuccess: (_, eventId) => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['my-events'] });
+    },
+  });
+}
+
+/**
+ * Hook to create or update an RSVP
+ */
+export function useRsvp() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async ({
+      eventId,
+      status,
+    }: {
+      eventId: string;
+      status: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      validateOrThrow(createRsvpSchema, { event_id: eventId, status });
+
+      // Get event details
+      const { data: event } = await supabase
+        .from('events')
+        .select('max_attendees, requires_approval')
+        .eq('id', eventId)
+        .single();
+
+      if (!event) throw new Error('Event not found');
+
+      // Determine actual status based on event rules
+      let actualStatus = status;
+      
+      // If event requires approval and user is not going/maybe already
+      if (event.requires_approval && (status === 'going' || status === 'maybe')) {
+        actualStatus = 'pending';
+      }
+
+      // Check if spots are available
+      if (status === 'going' && event.max_attendees) {
+        const { data: goingRsvps } = await supabase
+          .from('event_rsvps')
+          .select('id')
+          .eq('event_id', eventId)
+          .eq('status', 'going');
+
+        if ((goingRsvps?.length || 0) >= event.max_attendees) {
+          actualStatus = 'waitlist';
+        }
+      }
+
+      // Upsert RSVP
+      const { data: rsvp, error } = await supabase
+        .from('event_rsvps')
+        .upsert(
+          {
+            event_id: eventId,
+            user_id: user.id,
+            status: actualStatus,
+          },
+          { onConflict: 'event_id,user_id' }
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return rsvp as DbEventRsvp;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['my-rsvps'] });
+      queryClient.invalidateQueries({ queryKey: ['event-attendees', variables.eventId] });
+    },
+  });
+}
+
+/**
+ * Hook to cancel an RSVP
+ */
+export function useCancelRsvp() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      if (!user) throw new Error('Not authenticated');
+      validateOrThrow(eventUuidSchema, eventId);
+
+      const { error } = await supabase
+        .from('event_rsvps')
+        .delete()
+        .eq('event_id', eventId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+    onSuccess: (_, eventId) => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['my-rsvps'] });
+      queryClient.invalidateQueries({ queryKey: ['event-attendees', eventId] });
+    },
+  });
+}
+
+/**
+ * Hook to approve a pending RSVP (for event hosts)
+ */
+export function useApproveRsvp() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async ({ eventId, userId }: { eventId: string; userId: string }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Verify user is the host
+      const { data: event } = await supabase
+        .from('events')
+        .select('host_id, max_attendees')
+        .eq('id', eventId)
+        .single();
+
+      if (!event || event.host_id !== user.id) {
+        throw new Error('Unauthorized: Only event host can approve RSVPs');
+      }
+
+      // Check if spots are available
+      let newStatus: 'going' | 'waitlist' = 'going';
+      if (event.max_attendees) {
+        const { data: goingRsvps } = await supabase
+          .from('event_rsvps')
+          .select('id')
+          .eq('event_id', eventId)
+          .eq('status', 'going');
+
+        if ((goingRsvps?.length || 0) >= event.max_attendees) {
+          newStatus = 'waitlist';
+        }
+      }
+
+      const { error } = await supabase
+        .from('event_rsvps')
+        .update({ status: newStatus })
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      return { success: true, status: newStatus };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['event', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['event-attendees', variables.eventId] });
+    },
+  });
+}
+
+/**
+ * Hook to decline a pending RSVP (for event hosts)
+ */
+export function useDeclineRsvp() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async ({ eventId, userId }: { eventId: string; userId: string }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Verify user is the host
+      const { data: event } = await supabase
+        .from('events')
+        .select('host_id')
+        .eq('id', eventId)
+        .single();
+
+      if (!event || event.host_id !== user.id) {
+        throw new Error('Unauthorized: Only event host can decline RSVPs');
+      }
+
+      const { error } = await supabase
+        .from('event_rsvps')
+        .update({ status: 'declined' })
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['event', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['event-attendees', variables.eventId] });
+    },
+  });
+}
+
+/**
+ * Hook to check in an attendee (for event hosts)
+ */
+export function useCheckInAttendee() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async ({ eventId, userId }: { eventId: string; userId: string }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Verify user is the host
+      const { data: event } = await supabase
+        .from('events')
+        .select('host_id')
+        .eq('id', eventId)
+        .single();
+
+      if (!event || event.host_id !== user.id) {
+        throw new Error('Unauthorized: Only event host can check in attendees');
+      }
+
+      const { error } = await supabase
+        .from('event_rsvps')
+        .update({
+          checked_in: true,
+          checked_in_at: new Date().toISOString(),
+        })
+        .eq('event_id', eventId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['event-attendees', variables.eventId] });
+    },
+  });
+}
