@@ -84,9 +84,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-1', profile_id: 'profile-1', prompt_id: 'pp-1', prompt_text: 'Our ideal Saturday night looks like...', response_text: 'Good conversation over drinks, maybe a house party with like-minded people.' },
     ],
-    latitude: 37.7749,
-    longitude: -122.4194,
-    show_on_map: true,
   },
   {
     id: 'profile-2',
@@ -109,9 +106,6 @@ export const MOCK_PROFILES: Profile[] = [
       { id: 'pr-2', profile_id: 'profile-2', prompt_id: 'pp-3', prompt_text: 'What ENM means to us...', response_text: 'Freedom to explore while maintaining our strong foundation. Honesty is everything.' },
       { id: 'pr-3', profile_id: 'profile-2', prompt_id: 'pp-5', prompt_text: "We're excited to explore...", response_text: 'Club nights, house parties, and building a community of friends.' },
     ],
-    latitude: 37.80, // Fuzzed to ~0.01 degrees (~1.1 km precision for privacy)
-    longitude: -122.27,
-    show_on_map: true,
   },
   {
     id: 'profile-3',
@@ -132,9 +126,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-4', profile_id: 'profile-3', prompt_id: 'pp-2', prompt_text: 'We connect best with people who...', response_text: "Are emotionally intelligent, communicate openly, and don't play games." },
     ],
-    latitude: 37.87, // Fuzzed to ~0.01 degrees precision
-    longitude: -122.27,
-    show_on_map: true,
   },
   {
     id: 'profile-4',
@@ -157,9 +148,6 @@ export const MOCK_PROFILES: Profile[] = [
       { id: 'pr-5', profile_id: 'profile-4', prompt_id: 'pp-4', prompt_text: 'Our boundaries include...', response_text: 'Always meeting both partners first, clear communication, and mutual respect.' },
       { id: 'pr-6', profile_id: 'profile-4', prompt_id: 'pp-6', prompt_text: 'The vibe we bring is...', response_text: 'Playful, curious, and always respectful. I love making couples feel comfortable.' },
     ],
-    latitude: 37.76, // Fuzzed coordinates
-    longitude: -122.44,
-    show_on_map: true,
   },
   {
     id: 'profile-5',
@@ -180,9 +168,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-7', profile_id: 'profile-5', prompt_id: 'pp-1', prompt_text: 'Our ideal Saturday night looks like...', response_text: 'Dinner with new friends that leads to wherever the night takes us.' },
     ],
-    latitude: 37.44, // Fuzzed to 2 decimal places (~1.1 km precision)
-    longitude: -122.14,
-    show_on_map: true,
   },
   // New profiles in different cities
   {
@@ -204,9 +189,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-8', profile_id: 'profile-6', prompt_id: 'pp-1', prompt_text: 'Our ideal Saturday night looks like...', response_text: 'Sunset drinks in WeHo, then seeing where the night takes us.' },
     ],
-    latitude: 34.05, // Fuzzed coordinates
-    longitude: -118.24,
-    show_on_map: true,
   },
   {
     id: 'profile-7',
@@ -227,9 +209,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-9', profile_id: 'profile-7', prompt_id: 'pp-6', prompt_text: 'The vibe we bring is...', response_text: 'Fun, flirty, and always down for video dates when distance is a factor.' },
     ],
-    latitude: 40.71, // Fuzzed coordinates
-    longitude: -74.01,
-    show_on_map: false, // Virtual only, may not want to show exact location
   },
   {
     id: 'profile-8',
@@ -250,9 +229,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-10', profile_id: 'profile-8', prompt_id: 'pp-3', prompt_text: 'What ENM means to us...', response_text: 'Building a chosen family of people who genuinely care for each other.' },
     ],
-    latitude: 45.52, // Fuzzed to 2 decimal places
-    longitude: -122.68,
-    show_on_map: true,
   },
   {
     id: 'profile-9',
@@ -273,8 +249,6 @@ export const MOCK_PROFILES: Profile[] = [
     prompt_responses: [
       { id: 'pr-11', profile_id: 'profile-9', prompt_id: 'pp-2', prompt_text: 'We connect best with people who...', response_text: 'Take time to build emotional intimacy before anything physical.' },
     ],
-    // Virtual only - no location
-    show_on_map: false,
   },
   {
     id: 'profile-10',
