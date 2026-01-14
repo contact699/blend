@@ -44,6 +44,7 @@ import EmojiPicker from '@/components/EmojiPicker';
 import GifPicker from '@/components/GifPicker';
 import GameLauncher from '@/components/games/GameLauncher';
 import GameOverlay from '@/components/games/GameOverlay';
+import { useActiveGameSession } from '@/lib/supabase/hooks';
 
 export default function GroupChatScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
@@ -57,9 +58,9 @@ export default function GroupChatScreen() {
   const markAsRead = useDatingStore((s) => s.markAsRead);
   const addReaction = useDatingStore((s) => s.addReaction);
   const removeReaction = useDatingStore((s) => s.removeReaction);
-  const startGame = useDatingStore((s) => s.startGame);
-  const endGame = useDatingStore((s) => s.endGame);
-  const gameSessions = useDatingStore((s) => s.gameSessions);
+  
+  // Use Supabase for game sessions instead of local store
+  const { data: activeGameSession } = useActiveGameSession(threadId);
 
   const [messageText, setMessageText] = useState('');
   const [showOptions, setShowOptions] = useState(false);
@@ -111,14 +112,6 @@ export default function GroupChatScreen() {
       .map((id) => MOCK_PROFILES.find((p: Profile) => p.user_id === id))
       .filter((p): p is Profile => p !== undefined);
   }, [thread, currentUserId]);
-
-  // Get active game for this thread - subscribe to gameSessions for reactivity
-  const activeGame = useMemo(() => {
-    if (!threadId) return null;
-    return gameSessions.find(
-      (g) => g.thread_id === threadId && g.status === 'active'
-    ) ?? null;
-  }, [threadId, gameSessions]);
 
   // Mark messages as read
   useEffect(() => {
@@ -248,28 +241,24 @@ export default function GroupChatScreen() {
   };
 
   // Game handlers
-  const handleStartGame = (gameType: GameType, gameParticipants: GameParticipant[]) => {
-    if (!threadId) return;
-    const game = startGame(threadId, gameType, gameParticipants);
-    if (game) {
-      setShowGameOverlay(true);
-      // Send system message about game starting
-      sendMessage(threadId, `Started a game of ${gameType.replace(/_/g, ' ')}!`, false, 'system');
+  const handleGameStarted = (gameSessionId: string) => {
+    setShowGameOverlay(true);
+    // Send system message about game starting
+    if (threadId) {
+      sendMessage(threadId, 'Started a new game!', false, 'system');
     }
   };
 
   const handleEndGame = (cancelled = false) => {
-    if (activeGame) {
-      endGame(activeGame.id, cancelled);
-      setShowGameOverlay(false);
-      if (threadId) {
-        sendMessage(
-          threadId,
-          cancelled ? 'Game was cancelled' : 'Game completed!',
-          false,
-          'system'
-        );
-      }
+    // Game ending is handled through GameOverlay component using Supabase hooks
+    setShowGameOverlay(false);
+    if (threadId) {
+      sendMessage(
+        threadId,
+        cancelled ? 'Game was cancelled' : 'Game completed!',
+        false,
+        'system'
+      );
     }
   };
 
@@ -693,7 +682,7 @@ export default function GroupChatScreen() {
                   onPress={() => setShowGameLauncher(true)}
                   className="w-10 h-10 rounded-full items-center justify-center"
                 >
-                  <Gamepad2 size={22} color={activeGame ? '#c084fc' : '#6b7280'} />
+                  <Gamepad2 size={22} color={activeGameSession ? '#c084fc' : '#6b7280'} />
                 </Pressable>
 
                 {/* GIF button */}
@@ -860,7 +849,8 @@ export default function GroupChatScreen() {
       <GameLauncher
         visible={showGameLauncher}
         onClose={() => setShowGameLauncher(false)}
-        onStartGame={handleStartGame}
+        onGameStarted={handleGameStarted}
+        threadId={threadId!}
         participants={participants}
         currentUserId={currentUserId}
       />
@@ -868,14 +858,14 @@ export default function GroupChatScreen() {
       {/* Game Overlay */}
       <GameOverlay
         visible={showGameOverlay}
-        game={activeGame}
+        game={activeGameSession}
         currentUserId={currentUserId}
         onClose={() => setShowGameOverlay(false)}
         onEndGame={handleEndGame}
       />
 
       {/* Active Game Banner */}
-      {activeGame && !showGameOverlay && (
+      {activeGameSession && !showGameOverlay && (
         <Pressable
           onPress={() => setShowGameOverlay(true)}
           className="absolute top-28 left-4 right-4"
