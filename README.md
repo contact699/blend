@@ -262,7 +262,13 @@ Powerful search and filtering system to find exactly who you're looking for:
 **Result Views**
 - **Card View**: Full profile cards with photos, trust score, match reasons
 - **List View**: Compact list grouped by result type (People, Events, Articles, Messages)
-- **Map View**: Location-based profile discovery (placeholder)
+- **Map View**: Interactive map showing nearby profiles and events with custom markers
+  - User location display (with permission)
+  - Profile markers with photos, trust scores, and online status
+  - Event markers with attendee counts
+  - Tap markers to see preview cards
+  - Dark theme map styling
+  - Privacy-focused fuzzy locations
 - Toggle between views with persistent preference
 
 **Sort Options**

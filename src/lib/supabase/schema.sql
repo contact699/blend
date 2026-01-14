@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   virtual_only BOOLEAN DEFAULT false,
   response_style TEXT DEFAULT 'relaxed' CHECK (response_style IN ('quick', 'relaxed')),
   voice_intro_url TEXT,
+  latitude DECIMAL(10, 8), -- Fuzzy location for privacy (approximate area, not exact)
+  longitude DECIMAL(11, 8), -- Fuzzy location for privacy (approximate area, not exact)
+  show_on_map BOOLEAN DEFAULT true, -- Privacy setting: show profile on map view
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
