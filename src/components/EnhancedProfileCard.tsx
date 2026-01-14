@@ -13,9 +13,8 @@ import {
   MessageCircle,
   Wifi,
 } from 'lucide-react-native';
-import { Profile, ENMBadge, RelationshipStructure, STITestRecord, TrustTier, TrustBadge as TrustBadgeType, QuizResult } from '@/lib/types';
+import { Profile, ENMBadge, RelationshipStructure, STITestRecord, TrustTier, TrustBadge as TrustBadgeType } from '@/lib/types';
 import { ENM_BADGES, RELATIONSHIP_STRUCTURES } from '@/lib/mock-data';
-import { PROFILE_TYPE_NAMES } from '@/lib/supabase/types';
 import { TrustBadgeIcon } from './TrustBadge';
 import { TrustScorePreview } from './TrustScoreCard';
 
@@ -30,8 +29,6 @@ interface EnhancedProfileCardProps {
   trustTier?: TrustTier;
   trustScore?: number;
   trustBadges?: TrustBadgeType[];
-  quizResult?: QuizResult;
-  showQuizOnProfile?: boolean;
   onPress?: () => void;
   isCompact?: boolean;
 }
@@ -92,19 +89,6 @@ function STIStatusIndicator({ record }: { record: STITestRecord }) {
   );
 }
 
-function QuizProfileBadge({ profileType }: { profileType: string }) {
-  // Convert database format to display name
-  const profileKey = profileType.toLowerCase().replace(/ /g, '_') as keyof typeof PROFILE_TYPE_NAMES;
-  const displayName = PROFILE_TYPE_NAMES[profileKey] || profileType;
-
-  return (
-    <View className="flex-row items-center px-3 py-1.5 rounded-full bg-purple-500/20">
-      <Sparkles size={14} color="#c084fc" />
-      <Text className="text-purple-400 text-sm ml-1.5 font-medium">{displayName}</Text>
-    </View>
-  );
-}
-
 export default function EnhancedProfileCard({
   profile,
   badges = [],
@@ -114,8 +98,6 @@ export default function EnhancedProfileCard({
   trustTier,
   trustScore,
   trustBadges = [],
-  quizResult,
-  showQuizOnProfile = true,
   onPress,
   isCompact = false,
 }: EnhancedProfileCardProps) {
@@ -160,12 +142,6 @@ export default function EnhancedProfileCard({
               {relationshipStructure && (
                 <View className="mt-2">
                   <RelationshipStructureBadge structure={relationshipStructure} />
-                </View>
-              )}
-
-              {quizResult && showQuizOnProfile && (
-                <View className="mt-2">
-                  <QuizProfileBadge profileType={quizResult.compatibility_profile} />
                 </View>
               )}
             </View>
@@ -258,13 +234,6 @@ export default function EnhancedProfileCard({
             {relationshipStructure && (
               <View className="mb-3">
                 <RelationshipStructureBadge structure={relationshipStructure} />
-              </View>
-            )}
-
-            {/* Quiz Profile Badge */}
-            {quizResult && showQuizOnProfile && (
-              <View className="mb-3">
-                <QuizProfileBadge profileType={quizResult.compatibility_profile} />
               </View>
             )}
 

@@ -562,7 +562,10 @@ function renderListItemContent(result: AnySearchResult) {
   }
 }
 
-// Map View - Shows profiles on a map
+// Map View - Import the actual component
+import MapViewComponent from './MapView';
+
+// Map View wrapper
 function MapView({
   results,
   onResultPress,
@@ -570,21 +573,7 @@ function MapView({
   results: ProfileSearchResult[];
   onResultPress: (result: AnySearchResult) => void;
 }) {
-  // Placeholder map view - would use react-native-maps in production
-  return (
-    <View className="flex-1 bg-zinc-900 items-center justify-center">
-      <View className="w-32 h-32 rounded-full bg-zinc-800 items-center justify-center mb-4">
-        <Map size={48} color="#71717a" />
-      </View>
-      <Text className="text-white text-lg font-semibold mb-2">Map View</Text>
-      <Text className="text-zinc-400 text-center px-8 mb-4">
-        {results.length} profiles in your area
-      </Text>
-      <Text className="text-zinc-500 text-sm text-center px-8">
-        Map integration coming soon. Use Card or List view for now.
-      </Text>
-    </View>
-  );
+  return <MapViewComponent results={results} onResultPress={onResultPress} />;
 }
 
 // Helper Components

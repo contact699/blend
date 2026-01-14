@@ -47,6 +47,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   virtual_only BOOLEAN DEFAULT false,
   response_style TEXT DEFAULT 'relaxed' CHECK (response_style IN ('quick', 'relaxed')),
   voice_intro_url TEXT,
+  -- Location coordinates with intentionally reduced precision for privacy protection
+  -- DECIMAL(10, 8) for latitude: allows -90.00000000 to 90.00000000 (8 decimal places)
+  -- DECIMAL(11, 8) for longitude: allows -180.00000000 to 180.00000000 (8 decimal places)
+  -- However, storing only 2 decimal places (~1.1km accuracy) is recommended for privacy
+  -- This prevents exact location tracking while maintaining general area information
+  -- Example: 37.77 instead of 37.7749295 for San Francisco
+  latitude DECIMAL(10, 8), -- Fuzzy location for privacy (approximate area, not exact)
+  longitude DECIMAL(11, 8), -- Fuzzy location for privacy (approximate area, not exact)
+  show_on_map BOOLEAN DEFAULT true, -- Privacy setting: show profile on map view
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
@@ -601,78 +610,4 @@ CREATE TRIGGER update_matches_updated_at
 
 CREATE TRIGGER update_prompt_responses_updated_at
   BEFORE UPDATE ON public.prompt_responses
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
--- ============================================================================
--- QUIZ RESULTS TABLE
--- ============================================================================
-CREATE TABLE IF NOT EXISTS public.quiz_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-  
-  -- Individual question answers (store for re-calculation if needed)
-  answers JSONB NOT NULL, -- Array of { questionId, answerId, value }
-  
-  -- Calculated scores (6 dimensions)
-  jealousy_score INTEGER NOT NULL CHECK (jealousy_score >= 0 AND jealousy_score <= 100),
-  communication_score INTEGER NOT NULL CHECK (communication_score >= 0 AND communication_score <= 100),
-  hierarchy_score INTEGER NOT NULL CHECK (hierarchy_score >= 0 AND hierarchy_score <= 100),
-  disclosure_score INTEGER NOT NULL CHECK (disclosure_score >= 0 AND disclosure_score <= 100),
-  time_management_score INTEGER NOT NULL CHECK (time_management_score >= 0 AND time_management_score <= 100),
-  boundaries_score INTEGER NOT NULL CHECK (boundaries_score >= 0 AND boundaries_score <= 100),
-  
-  -- Overall profile type
-  profile_type TEXT NOT NULL CHECK (profile_type IN (
-    'open_communicator',
-    'independent_explorer', 
-    'security_seeker',
-    'flexible_navigator',
-    'community_builder'
-  )),
-  
-  -- Visibility settings
-  show_on_profile BOOLEAN DEFAULT true,
-  share_with_matches BOOLEAN DEFAULT true,
-  
-  -- Timestamps
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  -- One result per user (can retake, updates existing)
-  UNIQUE(user_id)
-);
-
--- Enable RLS
-ALTER TABLE public.quiz_results ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies
-CREATE POLICY "Users can view own quiz results"
-  ON public.quiz_results FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own quiz results"
-  ON public.quiz_results FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own quiz results"
-  ON public.quiz_results FOR UPDATE
-  USING (auth.uid() = user_id);
-
--- Allow viewing quiz results of users who have sharing enabled (for matching)
-CREATE POLICY "Users can view shared quiz results"
-  ON public.quiz_results FOR SELECT
-  USING (
-    share_with_matches = true
-    AND EXISTS (
-      SELECT 1 FROM public.profiles WHERE id = quiz_results.user_id
-    )
-  );
-
--- Index for matching queries
-CREATE INDEX IF NOT EXISTS idx_quiz_results_user_id ON public.quiz_results(user_id);
-CREATE INDEX IF NOT EXISTS idx_quiz_results_profile_type ON public.quiz_results(profile_type);
-
--- Trigger for updated_at
-CREATE TRIGGER update_quiz_results_updated_at
-  BEFORE UPDATE ON public.quiz_results
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

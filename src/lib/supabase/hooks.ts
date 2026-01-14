@@ -1946,225 +1946,132 @@ export function useRefreshTasteProfile() {
   });
 }
 
-// ============================================================================
-// QUIZ RESULTS HOOKS
-// ============================================================================
-
-interface QuizResultData {
-  id: string;
-  user_id: string;
-  answers: Array<{ questionId: string; answerId: string; value: number }>;
-  jealousy_score: number;
-  communication_score: number;
-  hierarchy_score: number;
-  disclosure_score: number;
-  time_management_score: number;
-  boundaries_score: number;
-  profile_type: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
-  show_on_profile: boolean;
-  share_with_matches: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 /**
- * Hook to get current user's quiz results
+ * Hook to get nearby profiles within a radius
+ * Uses Haversine formula to calculate distance
+ * 
+ * Note: For better performance in production, implement spatial database queries
+ * using PostGIS extensions in PostgreSQL to filter by distance at the database level
+ * rather than fetching all profiles and filtering in JavaScript.
  */
-export function useMyQuizResults() {
+export function useNearbyProfiles(
+  latitude: number | undefined,
+  longitude: number | undefined,
+  radiusMiles: number = 25
+) {
   const { data: user } = useCurrentUser();
 
   return useQuery({
-    queryKey: ['quiz-results', user?.id],
+    queryKey: ['nearby-profiles', latitude, longitude, radiusMiles],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user || !latitude || !longitude) return [];
 
-      const { data, error } = await supabase
-        .from('quiz_results')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[QuizResults] Error fetching:', error);
-        return null;
-      }
-
-      return data as QuizResultData | null;
-    },
-    enabled: !!user?.id,
-  });
-}
-
-/**
- * Hook to get another user's quiz results (if shared)
- */
-export function useUserQuizResults(userId?: string) {
-  const { data: currentUser } = useCurrentUser();
-
-  return useQuery({
-    queryKey: ['quiz-results', userId],
-    queryFn: async () => {
-      if (!userId || !currentUser) return null;
-
-      const { data, error } = await supabase
-        .from('quiz_results')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[QuizResults] Error fetching user quiz:', error);
-        return null;
-      }
-
-      // RLS will filter this if not shared
-      return data as QuizResultData | null;
-    },
-    enabled: !!userId && !!currentUser,
-  });
-}
-
-/**
- * Hook to submit or update quiz results
- */
-export function useSubmitQuizResults() {
-  const queryClient = useQueryClient();
-  const { data: user } = useCurrentUser();
-
-  return useMutation({
-    mutationFn: async (input: {
-      answers: Array<{ questionId: string; answerId: string; value: number }>;
-      jealousy_score: number;
-      communication_score: number;
-      hierarchy_score: number;
-      disclosure_score: number;
-      time_management_score: number;
-      boundaries_score: number;
-      profile_type: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
-      show_on_profile?: boolean;
-      share_with_matches?: boolean;
-    }) => {
-      if (!user?.id) throw new Error('Not authenticated');
-
-      // Upsert quiz results (insert or update)
-      const { data, error } = await supabase
-        .from('quiz_results')
-        .upsert({
-          user_id: user.id,
-          answers: input.answers,
-          jealousy_score: input.jealousy_score,
-          communication_score: input.communication_score,
-          hierarchy_score: input.hierarchy_score,
-          disclosure_score: input.disclosure_score,
-          time_management_score: input.time_management_score,
-          boundaries_score: input.boundaries_score,
-          profile_type: input.profile_type,
-          show_on_profile: input.show_on_profile ?? true,
-          share_with_matches: input.share_with_matches ?? true,
-        }, { onConflict: 'user_id' })
-        .select()
-        .single();
+      // Fetch all profiles that have location data and show_on_map enabled
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          user_id,
+          display_name,
+          age,
+          city,
+          bio,
+          latitude,
+          longitude,
+          show_on_map,
+          pace_preference,
+          no_photos,
+          open_to_meet,
+          virtual_only,
+          response_style,
+          voice_intro_url
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .eq('show_on_map', true)
+        .neq('user_id', user.id); // Exclude current user
 
       if (error) throw error;
-      return data as QuizResultData;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quiz-results'] });
-    },
-  });
-}
 
-/**
- * Hook to update quiz visibility settings
- */
-export function useUpdateQuizVisibility() {
-  const queryClient = useQueryClient();
-  const { data: user } = useCurrentUser();
-
-  return useMutation({
-    mutationFn: async (input: {
-      show_on_profile?: boolean;
-      share_with_matches?: boolean;
-    }) => {
-      if (!user?.id) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('quiz_results')
-        .update({
-          show_on_profile: input.show_on_profile,
-          share_with_matches: input.share_with_matches,
+      // Calculate distance for each profile and filter by radius
+      const nearbyProfiles = profiles
+        ?.map((profile: any) => {
+          const distance = calculateDistance(
+            latitude,
+            longitude,
+            profile.latitude,
+            profile.longitude
+          );
+          return { ...profile, distance };
         })
-        .eq('user_id', user.id)
-        .select()
-        .single();
+        .filter((profile: any) => profile.distance <= radiusMiles)
+        .sort((a: any, b: any) => a.distance - b.distance) || [];
 
-      if (error) throw error;
-      return data as QuizResultData;
+      return nearbyProfiles;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quiz-results'] });
-    },
+    enabled: !!user && !!latitude && !!longitude,
   });
 }
 
 /**
- * Hook to calculate compatibility between two users' quiz results
+ * Hook to get nearby events within a radius
  */
-export function useQuizCompatibility(userId1?: string, userId2?: string) {
+export function useNearbyEvents(
+  latitude: number | undefined,
+  longitude: number | undefined,
+  radiusMiles: number = 25
+) {
+  const { data: user } = useCurrentUser();
+
   return useQuery({
-    queryKey: ['quiz-compatibility', userId1, userId2],
+    queryKey: ['nearby-events', latitude, longitude, radiusMiles],
     queryFn: async () => {
-      if (!userId1 || !userId2) return null;
+      if (!user || !latitude || !longitude) return [];
 
-      // Fetch both quiz results
-      const [result1Response, result2Response] = await Promise.all([
-        supabase.from('quiz_results').select('*').eq('user_id', userId1).maybeSingle(),
-        supabase.from('quiz_results').select('*').eq('user_id', userId2).maybeSingle(),
-      ]);
+      // Note: Events table structure may vary - adjust as needed
+      // This is a placeholder implementation
+      // In production, you'd fetch events from the events table
+      // with location data and calculate distances
 
-      if (result1Response.error || result2Response.error) {
-        console.error('[QuizCompatibility] Error fetching:', result1Response.error || result2Response.error);
-        return null;
-      }
-
-      const result1 = result1Response.data as QuizResultData | null;
-      const result2 = result2Response.data as QuizResultData | null;
-
-      if (!result1 || !result2) return null;
-
-      // Calculate compatibility score (0-100)
-      const dimensions = [
-        { key: 'communication_score', weight: 0.2 },
-        { key: 'jealousy_score', weight: 0.2 },
-        { key: 'time_management_score', weight: 0.15 },
-        { key: 'hierarchy_score', weight: 0.15 },
-        { key: 'disclosure_score', weight: 0.15 },
-        { key: 'boundaries_score', weight: 0.15 },
-      ] as const;
-
-      let totalSimilarity = 0;
-      const dimensionScores: Record<string, number> = {};
-
-      dimensions.forEach(({ key, weight }) => {
-        const val1 = result1[key];
-        const val2 = result2[key];
-        const diff = Math.abs(val1 - val2);
-        const similarity = 1 - diff / 100; // Max diff is 100
-        dimensionScores[key] = similarity * 100;
-        totalSimilarity += similarity * weight;
-      });
-
-      const overallScore = totalSimilarity * 100;
-
-      return {
-        score: Math.round(overallScore),
-        dimensionScores,
-        profile1: result1.profile_type,
-        profile2: result2.profile_type,
-        profileMatch: result1.profile_type === result2.profile_type,
-      };
+      // For now, return empty array as events are using mock data
+      return [];
     },
-    enabled: !!userId1 && !!userId2,
+    enabled: !!user && !!latitude && !!longitude,
   });
 }
 
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ * Returns distance in miles
+ * 
+ * Note: This assumes spherical Earth geometry and has reduced accuracy
+ * at extreme latitudes (near poles). For more precise calculations over
+ * long distances or at extreme latitudes, consider using an ellipsoidal
+ * model like Vincenty's formula.
+ */
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const EARTH_RADIUS_MILES = 3959; // Earth's mean radius in miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = EARTH_RADIUS_MILES * c;
+  
+  return distance;
+}
+
+function toRad(degrees: number): number {
+  return degrees * (Math.PI / 180);
+}

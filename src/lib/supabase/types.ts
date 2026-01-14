@@ -675,53 +675,6 @@ export interface Database {
           dwell_time_ms?: number;
         };
       };
-      quiz_results: {
-        Row: {
-          id: string; // UUID
-          user_id: string; // UUID - FK to users
-          answers: QuizAnswer[];
-          jealousy_score: number;
-          communication_score: number;
-          hierarchy_score: number;
-          disclosure_score: number;
-          time_management_score: number;
-          boundaries_score: number;
-          profile_type: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
-          show_on_profile: boolean;
-          share_with_matches: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          answers: QuizAnswer[];
-          jealousy_score: number;
-          communication_score: number;
-          hierarchy_score: number;
-          disclosure_score: number;
-          time_management_score: number;
-          boundaries_score: number;
-          profile_type: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
-          show_on_profile?: boolean;
-          share_with_matches?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          answers?: QuizAnswer[];
-          jealousy_score?: number;
-          communication_score?: number;
-          hierarchy_score?: number;
-          disclosure_score?: number;
-          time_management_score?: number;
-          boundaries_score?: number;
-          profile_type?: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
-          show_on_profile?: boolean;
-          share_with_matches?: boolean;
-          updated_at?: string;
-        };
-      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -732,13 +685,6 @@ export interface Database {
     };
     Enums: Record<string, never>;
   };
-}
-
-// Quiz answer structure
-export interface QuizAnswer {
-  questionId: string;
-  answerId: string;
-  value: number; // 1-5 scale typically
 }
 
 // Helper types for easier usage
@@ -769,13 +715,3 @@ export type DateReviewRow = Tables<'date_reviews'>;
 export type CommunityVouchRow = Tables<'community_vouches'>;
 export type UserTasteProfileRow = Tables<'user_taste_profiles'>;
 export type ProfileViewRow = Tables<'profile_views'>;
-export type QuizResultRow = Tables<'quiz_results'>;
-
-// Profile type display names
-export const PROFILE_TYPE_NAMES = {
-  open_communicator: 'Open Communicator',
-  independent_explorer: 'Independent Explorer',
-  security_seeker: 'Security Seeker',
-  flexible_navigator: 'Flexible Navigator',
-  community_builder: 'Community Builder',
-} as const;
