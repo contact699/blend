@@ -8,8 +8,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,16 +35,17 @@ import {
   ChevronDown,
   Check,
 } from 'lucide-react-native';
-import { EVENT_CATEGORIES } from '@/lib/mock-events';
-import { EventCategory, EventVisibility } from '@/lib/types';
-import { useCreateEvent, useCurrentProfile } from '@/lib/supabase/hooks';
+import useDatingStore from '@/lib/state/dating-store';
+import { EVENT_CATEGORIES, MOCK_HOSTS } from '@/lib/mock-events';
+import { EventCategory, EventVisibility, EventLocation } from '@/lib/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function CreateEventScreen() {
   const router = useRouter();
-  const { data: currentProfile } = useCurrentProfile();
-  const createEventMutation = useCreateEvent();
+  const createEvent = useDatingStore((s) => s.createEvent);
+  const currentUserId = useDatingStore((s) => s.currentUserId);
+  const currentProfile = useDatingStore((s) => s.currentProfile);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -56,7 +55,9 @@ export default function CreateEventScreen() {
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [locationText, setLocationText] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [locationAddress, setLocationAddress] = useState('');
+  const [locationCity, setLocationCity] = useState('');
   const [isVirtual, setIsVirtual] = useState(false);
   const [virtualLink, setVirtualLink] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -96,50 +97,54 @@ export default function CreateEventScreen() {
   const isStep2Valid = description.length > 0;
   const isStep3Valid = isVirtual
     ? virtualLink.length > 0
-    : locationText.length > 0;
+    : locationName.length > 0 && locationCity.length > 0;
   const isStep4Valid = startDate.length > 0 && startTime.length > 0;
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     if (!category || !currentProfile) return;
 
-    // Validate required fields
-    if (!isStep1Valid || !isStep2Valid || !isStep3Valid || !isStep4Valid) {
-      Alert.alert('Missing Information', 'Please fill in all required fields');
-      return;
-    }
+    const host = MOCK_HOSTS.find((h) => h.user_id === currentUserId) ?? {
+      user_id: currentUserId,
+      display_name: currentProfile.display_name,
+      photo: currentProfile.photos[0],
+      reputation_stars: 3,
+      events_hosted: 0,
+    };
 
-    try {
-      // Create ISO datetime strings
-      const startDateTime = new Date(`${startDate}T${startTime}:00`).toISOString();
-      const endDateTime = endTime 
-        ? new Date(`${startDate}T${endTime}:00`).toISOString()
-        : new Date(new Date(`${startDate}T${startTime}:00`).getTime() + 2 * 60 * 60 * 1000).toISOString(); // Default to 2 hours later
+    const location: EventLocation = {
+      name: isVirtual ? 'Virtual Event' : locationName,
+      address: isVirtual ? 'Online' : locationAddress,
+      city: isVirtual ? 'Virtual' : locationCity,
+      latitude: 37.7749,
+      longitude: -122.4194,
+      is_virtual: isVirtual,
+      virtual_link: isVirtual ? virtualLink : undefined,
+    };
 
-      const eventData = {
-        title,
-        description,
-        category,
-        coverPhotoUri: coverImage || undefined,
-        location: isVirtual ? 'Virtual' : locationText,
-        meeting_link: isVirtual ? virtualLink : undefined,
-        start_time: startDateTime,
-        end_time: endDateTime,
-        timezone: 'America/Los_Angeles',
-        max_attendees: maxAttendees ? parseInt(maxAttendees, 10) : null,
-        visibility,
-        requires_approval: requiresApproval,
-        tags,
-      };
+    const newEvent = createEvent({
+      host_id: currentUserId,
+      host,
+      title,
+      description,
+      cover_image: coverImage ?? 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800',
+      category,
+      tags,
+      location,
+      start_date: startDate || new Date().toISOString().split('T')[0],
+      start_time: startTime || '18:00',
+      end_time: endTime || undefined,
+      timezone: 'America/Los_Angeles',
+      max_attendees: maxAttendees ? parseInt(maxAttendees, 10) : undefined,
+      visibility,
+      requires_approval: requiresApproval,
+      status: 'draft',
+      is_featured: false,
+      is_recurring: false,
+    });
 
-      const newEvent = await createEventMutation.mutateAsync(eventData);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-      router.push(`/event/${newEvent.id}`);
-    } catch (error) {
-      console.error('Error creating event:', error);
-      Alert.alert('Error', 'Failed to create event. Please try again.');
-    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.back();
+    router.push(`/event/${newEvent.id}`);
   };
 
   return (
@@ -415,16 +420,36 @@ export default function CreateEventScreen() {
                   <>
                     <View className="mb-4">
                       <Text className="text-zinc-400 text-sm mb-2">
-                        Location *
+                        Venue Name *
                       </Text>
                       <TextInput
-                        value={locationText}
-                        onChangeText={setLocationText}
-                        placeholder="e.g., The Velvet Lounge, 123 Main St, San Francisco"
+                        value={locationName}
+                        onChangeText={setLocationName}
+                        placeholder="e.g., The Velvet Lounge"
                         placeholderTextColor="#52525b"
                         className="bg-zinc-900/80 border border-zinc-800/50 rounded-xl px-4 py-3.5 text-white"
-                        multiline
-                        numberOfLines={2}
+                      />
+                    </View>
+
+                    <View className="mb-4">
+                      <Text className="text-zinc-400 text-sm mb-2">Address</Text>
+                      <TextInput
+                        value={locationAddress}
+                        onChangeText={setLocationAddress}
+                        placeholder="123 Main Street"
+                        placeholderTextColor="#52525b"
+                        className="bg-zinc-900/80 border border-zinc-800/50 rounded-xl px-4 py-3.5 text-white"
+                      />
+                    </View>
+
+                    <View className="mb-4">
+                      <Text className="text-zinc-400 text-sm mb-2">City *</Text>
+                      <TextInput
+                        value={locationCity}
+                        onChangeText={setLocationCity}
+                        placeholder="San Francisco"
+                        placeholderTextColor="#52525b"
+                        className="bg-zinc-900/80 border border-zinc-800/50 rounded-xl px-4 py-3.5 text-white"
                       />
                     </View>
                   </>
@@ -580,7 +605,6 @@ export default function CreateEventScreen() {
                 }
               }}
               disabled={
-                createEventMutation.isPending ||
                 (step === 1 && !isStep1Valid) ||
                 (step === 2 && !isStep2Valid) ||
                 (step === 3 && !isStep3Valid) ||
@@ -590,7 +614,6 @@ export default function CreateEventScreen() {
             >
               <LinearGradient
                 colors={
-                  createEventMutation.isPending ||
                   (step === 1 && !isStep1Valid) ||
                   (step === 2 && !isStep2Valid) ||
                   (step === 3 && !isStep3Valid) ||
@@ -602,19 +625,10 @@ export default function CreateEventScreen() {
                   paddingVertical: 16,
                   borderRadius: 16,
                   alignItems: 'center',
-                  flexDirection: 'row',
-                  justifyContent: 'center',
                 }}
               >
-                {createEventMutation.isPending && step === 4 && (
-                  <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
-                )}
                 <Text className="text-white font-bold">
-                  {createEventMutation.isPending && step === 4
-                    ? 'Creating...'
-                    : step < 4
-                    ? 'Continue'
-                    : 'Create Event'}
+                  {step < 4 ? 'Continue' : 'Create Event'}
                 </Text>
               </LinearGradient>
             </Pressable>

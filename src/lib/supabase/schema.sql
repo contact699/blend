@@ -545,198 +545,6 @@ USING (
 */
 
 -- ============================================================================
--- EVENTS TABLE
--- ============================================================================
-CREATE TABLE IF NOT EXISTS public.events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  host_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  title TEXT NOT NULL CHECK (length(title) >= 1 AND length(title) <= 100),
-  description TEXT CHECK (length(description) <= 2000),
-  category TEXT NOT NULL CHECK (category IN ('social', 'dating', 'education', 'party', 'outdoor', 'wellness', 'meetup', 'virtual', 'private', 'community')),
-  cover_photo_url TEXT,
-  location TEXT, -- Physical address or "Virtual"
-  meeting_link TEXT, -- For virtual events
-  start_time TIMESTAMPTZ NOT NULL,
-  end_time TIMESTAMPTZ NOT NULL,
-  timezone TEXT NOT NULL DEFAULT 'UTC',
-  max_attendees INTEGER CHECK (max_attendees IS NULL OR max_attendees > 0),
-  visibility TEXT NOT NULL DEFAULT 'public' CHECK (visibility IN ('public', 'friends_only', 'invite_only')),
-  requires_approval BOOLEAN DEFAULT false,
-  tags TEXT[] DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  cancelled_at TIMESTAMPTZ,
-  CONSTRAINT end_after_start CHECK (end_time > start_time)
-);
-
-ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
-
--- Anyone authenticated can view public events
-CREATE POLICY "Anyone can view public events" ON public.events
-  FOR SELECT USING (
-    visibility = 'public' AND cancelled_at IS NULL
-  );
-
--- Users can view their own events (any visibility)
-CREATE POLICY "Users can view their own events" ON public.events
-  FOR SELECT USING (auth.uid() = host_id);
-
--- TODO: Add friends_only and invite_only policies when friend system exists
--- For now, friends_only and invite_only events are only visible to the host
-
--- Only authenticated users can create events
-CREATE POLICY "Authenticated users can create events" ON public.events
-  FOR INSERT WITH CHECK (auth.uid() = host_id);
-
--- Only host can update their events
-CREATE POLICY "Hosts can update their events" ON public.events
-  FOR UPDATE USING (auth.uid() = host_id);
-
--- Only host can delete their events
-CREATE POLICY "Hosts can delete their events" ON public.events
-  FOR DELETE USING (auth.uid() = host_id);
-
--- ============================================================================
--- EVENT_RSVPS TABLE
--- ============================================================================
-CREATE TABLE IF NOT EXISTS public.event_rsvps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  status TEXT NOT NULL CHECK (status IN ('going', 'maybe', 'waitlist', 'pending', 'declined')),
-  checked_in BOOLEAN DEFAULT false,
-  checked_in_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(event_id, user_id)
-);
-
-ALTER TABLE public.event_rsvps ENABLE ROW LEVEL SECURITY;
-
--- Users can view RSVPs for events they can see
-CREATE POLICY "Users can view RSVPs for visible events" ON public.event_rsvps
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.events e
-      WHERE e.id = event_rsvps.event_id
-      AND (
-        e.visibility = 'public'
-        OR e.host_id = auth.uid()
-        OR EXISTS (
-          SELECT 1 FROM public.event_rsvps my_rsvp
-          WHERE my_rsvp.event_id = e.id
-          AND my_rsvp.user_id = auth.uid()
-          AND my_rsvp.status = 'going'
-        )
-      )
-    )
-  );
-
--- Users can create their own RSVPs
-CREATE POLICY "Users can create their own RSVPs" ON public.event_rsvps
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Users can update their own RSVPs
-CREATE POLICY "Users can update their own RSVPs" ON public.event_rsvps
-  FOR UPDATE USING (
-    auth.uid() = user_id
-    OR EXISTS (
-      SELECT 1 FROM public.events
-      WHERE id = event_rsvps.event_id AND host_id = auth.uid()
-    )
-  );
-
--- Users can delete their own RSVPs
-CREATE POLICY "Users can delete their own RSVPs" ON public.event_rsvps
-  FOR DELETE USING (auth.uid() = user_id);
-
--- ============================================================================
--- FUNCTION: Auto-promote waitlist when spot opens
--- ============================================================================
-CREATE OR REPLACE FUNCTION public.promote_from_waitlist()
-RETURNS TRIGGER AS $$
-DECLARE
-  event_max_attendees INTEGER;
-  current_going_count INTEGER;
-  next_waitlist_rsvp UUID;
-BEGIN
-  -- Get event max_attendees
-  SELECT max_attendees INTO event_max_attendees
-  FROM public.events
-  WHERE id = OLD.event_id;
-
-  -- If no max_attendees limit, no waitlist needed
-  IF event_max_attendees IS NULL THEN
-    RETURN OLD;
-  END IF;
-
-  -- Count current 'going' RSVPs
-  SELECT COUNT(*) INTO current_going_count
-  FROM public.event_rsvps
-  WHERE event_id = OLD.event_id AND status = 'going';
-
-  -- If a spot opened (going count < max) and there are waitlisted people
-  IF current_going_count < event_max_attendees THEN
-    -- Get oldest waitlist entry
-    SELECT id INTO next_waitlist_rsvp
-    FROM public.event_rsvps
-    WHERE event_id = OLD.event_id AND status = 'waitlist'
-    ORDER BY created_at ASC
-    LIMIT 1;
-
-    -- Promote from waitlist to going
-    IF next_waitlist_rsvp IS NOT NULL THEN
-      UPDATE public.event_rsvps
-      SET status = 'going', updated_at = NOW()
-      WHERE id = next_waitlist_rsvp;
-    END IF;
-  END IF;
-
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_promote_from_waitlist
-  AFTER UPDATE OR DELETE ON public.event_rsvps
-  FOR EACH ROW
-  WHEN (OLD.status = 'going')
-  EXECUTE FUNCTION public.promote_from_waitlist();
-
--- ============================================================================
--- STORAGE: Event Photos Bucket
--- ============================================================================
-/*
--- Run these commands in Supabase Dashboard > Storage:
-
--- 1. Create bucket 'event-photos' (private)
-INSERT INTO storage.buckets (id, name, public) VALUES ('event-photos', 'event-photos', false);
-
--- 2. Allow authenticated users to upload event photos
-CREATE POLICY "Event hosts can upload photos"
-ON storage.objects FOR INSERT
-WITH CHECK (
-  bucket_id = 'event-photos'
-  AND auth.role() = 'authenticated'
-);
-
--- 3. Allow anyone authenticated to read event photos (via signed URLs)
-CREATE POLICY "Anyone can view event photos"
-ON storage.objects FOR SELECT
-USING (
-  bucket_id = 'event-photos'
-  AND auth.role() = 'authenticated'
-);
-
--- 4. Allow hosts to delete their event photos
-CREATE POLICY "Event hosts can delete their photos"
-ON storage.objects FOR DELETE
-USING (
-  bucket_id = 'event-photos'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-);
-*/
-
--- ============================================================================
 -- FUNCTION: Generate signed URL for photos (call from client)
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.get_signed_photo_url(
@@ -767,13 +575,6 @@ CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at
 CREATE INDEX IF NOT EXISTS idx_likes_to_user ON public.likes(to_user_id);
 CREATE INDEX IF NOT EXISTS idx_pinds_to_user ON public.pinds(to_user_id);
 CREATE INDEX IF NOT EXISTS idx_blocked_users_both ON public.blocked_users(blocker_id, blocked_id);
-CREATE INDEX IF NOT EXISTS idx_events_host_id ON public.events(host_id);
-CREATE INDEX IF NOT EXISTS idx_events_start_time ON public.events(start_time);
-CREATE INDEX IF NOT EXISTS idx_events_category ON public.events(category);
-CREATE INDEX IF NOT EXISTS idx_events_visibility ON public.events(visibility);
-CREATE INDEX IF NOT EXISTS idx_event_rsvps_event_id ON public.event_rsvps(event_id);
-CREATE INDEX IF NOT EXISTS idx_event_rsvps_user_id ON public.event_rsvps(user_id);
-CREATE INDEX IF NOT EXISTS idx_event_rsvps_status ON public.event_rsvps(status);
 
 -- ============================================================================
 -- TRIGGER: Auto-update updated_at timestamps
@@ -802,10 +603,223 @@ CREATE TRIGGER update_prompt_responses_updated_at
   BEFORE UPDATE ON public.prompt_responses
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TRIGGER update_events_updated_at
-  BEFORE UPDATE ON public.events
+-- ============================================================================
+-- GAME SESSIONS TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.game_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  thread_id UUID NOT NULL REFERENCES public.chat_threads(id) ON DELETE CASCADE,
+  
+  -- Game configuration
+  game_type TEXT NOT NULL CHECK (game_type IN (
+    'truth_or_dare',
+    'hot_seat', 
+    'story_chain',
+    'mystery_date_planner',
+    'compatibility_triangle',
+    'group_challenge'
+  )),
+  
+  -- Game state
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'cancelled')),
+  current_turn_user_id UUID REFERENCES public.profiles(id),
+  turn_order UUID[] NOT NULL DEFAULT '{}',
+  current_round INTEGER DEFAULT 1,
+  max_rounds INTEGER,
+  
+  -- Game-specific config (stored as JSONB for flexibility)
+  config JSONB NOT NULL DEFAULT '{}',
+  
+  -- Game-specific state (changes during play)
+  game_state JSONB NOT NULL DEFAULT '{}',
+  
+  -- Metadata
+  started_by UUID REFERENCES public.profiles(id) NOT NULL,
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.game_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Index for quick lookups
+CREATE INDEX IF NOT EXISTS idx_game_sessions_thread_id ON public.game_sessions(thread_id);
+CREATE INDEX IF NOT EXISTS idx_game_sessions_status ON public.game_sessions(status);
+
+-- RLS Policies: Only thread participants can view/interact
+CREATE POLICY "Thread participants can view game sessions"
+  ON public.game_sessions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.chat_participants 
+      WHERE thread_id = game_sessions.thread_id 
+      AND user_id = auth.uid()
+      AND left_at IS NULL
+    )
+  );
+
+CREATE POLICY "Thread participants can create game sessions"
+  ON public.game_sessions FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.chat_participants 
+      WHERE thread_id = game_sessions.thread_id 
+      AND user_id = auth.uid()
+      AND left_at IS NULL
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = game_sessions.started_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Thread participants can update game sessions"
+  ON public.game_sessions FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.chat_participants 
+      WHERE thread_id = game_sessions.thread_id 
+      AND user_id = auth.uid()
+      AND left_at IS NULL
+    )
+  );
+
+-- ============================================================================
+-- GAME MOVES TABLE (for tracking individual actions)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.game_moves (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  game_session_id UUID REFERENCES public.game_sessions(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  
+  -- Move details
+  move_type TEXT NOT NULL,
+  move_data JSONB NOT NULL DEFAULT '{}',
+  
+  round_number INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.game_moves ENABLE ROW LEVEL SECURITY;
+
+-- Index for game history
+CREATE INDEX IF NOT EXISTS idx_game_moves_session ON public.game_moves(game_session_id);
+CREATE INDEX IF NOT EXISTS idx_game_moves_user ON public.game_moves(user_id);
+
+-- RLS Policies: Participants can view all, insert own
+CREATE POLICY "Participants can view game moves"
+  ON public.game_moves FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.game_sessions gs
+      JOIN public.chat_participants cp ON cp.thread_id = gs.thread_id
+      WHERE gs.id = game_moves.game_session_id
+      AND cp.user_id = auth.uid()
+      AND cp.left_at IS NULL
+    )
+  );
+
+CREATE POLICY "Participants can insert own moves"
+  ON public.game_moves FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = game_moves.user_id
+      AND user_id = auth.uid()
+    )
+  );
+
+-- ============================================================================
+-- CUSTOM GAME CONTENT TABLE (user-created challenges/questions)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.custom_game_content (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  
+  -- Content type
+  game_type TEXT NOT NULL CHECK (game_type IN ('truth_or_dare', 'hot_seat', 'story_chain')),
+  content_type TEXT NOT NULL,
+  
+  -- Content details
+  content TEXT NOT NULL,
+  category TEXT,
+  difficulty TEXT,
+  for_couples BOOLEAN DEFAULT false,
+  for_singles BOOLEAN DEFAULT true,
+  theme TEXT,
+  
+  -- Usage tracking
+  times_used INTEGER DEFAULT 0,
+  
+  -- Moderation
+  is_approved BOOLEAN DEFAULT true,
+  reported_count INTEGER DEFAULT 0,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.custom_game_content ENABLE ROW LEVEL SECURITY;
+
+-- Index for content retrieval
+CREATE INDEX IF NOT EXISTS idx_custom_content_game_type ON public.custom_game_content(game_type);
+CREATE INDEX IF NOT EXISTS idx_custom_content_creator ON public.custom_game_content(created_by);
+
+-- RLS Policies: Users can CRUD own, read approved content
+CREATE POLICY "Users can view own custom content"
+  ON public.custom_game_content FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can view approved content"
+  ON public.custom_game_content FOR SELECT
+  USING (is_approved = true);
+
+CREATE POLICY "Users can create own content"
+  ON public.custom_game_content FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update own content"
+  ON public.custom_game_content FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete own content"
+  ON public.custom_game_content FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = custom_game_content.created_by
+      AND user_id = auth.uid()
+    )
+  );
+
+-- Add triggers for updated_at
+CREATE TRIGGER update_game_sessions_updated_at
+  BEFORE UPDATE ON public.game_sessions
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TRIGGER update_event_rsvps_updated_at
-  BEFORE UPDATE ON public.event_rsvps
+CREATE TRIGGER update_custom_game_content_updated_at
+  BEFORE UPDATE ON public.custom_game_content
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

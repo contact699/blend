@@ -6,7 +6,6 @@ import {
   Pressable,
   TextInput,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,43 +31,59 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react-native';
+import useDatingStore from '@/lib/state/dating-store';
 import { EVENT_CATEGORIES } from '@/lib/mock-events';
 import { EventCategory } from '@/lib/types';
 import EventCard from '@/components/EventCard';
-import { useEvents } from '@/lib/supabase/hooks';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function EventsScreen() {
   const router = useRouter();
+  const events = useDatingStore((s) => s.events);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<EventCategory | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch events from Supabase
-  const { data: events = [], isLoading, refetch, isRefetching } = useEvents({
-    category: selectedCategory || undefined,
-  });
+  // Get featured events
+  const featuredEvents = useMemo(
+    () =>
+      events
+        .filter((e) => e.is_featured && e.status === 'published')
+        .slice(0, 5),
+    [events]
+  );
 
-  // Filter events locally for search
+  // Get filtered events
   const filteredEvents = useMemo(() => {
-    if (!searchQuery) return events;
-
-    const query = searchQuery.toLowerCase();
-    return events.filter((e) => {
-      return (
-        e.title.toLowerCase().includes(query) ||
-        (e.description && e.description.toLowerCase().includes(query)) ||
-        e.tags?.some((t) => t.toLowerCase().includes(query)) ||
-        (e.location && e.location.toLowerCase().includes(query))
+    return events
+      .filter((e) => {
+        if (e.status !== 'published') return false;
+        if (selectedCategory && e.category !== selectedCategory) return false;
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          return (
+            e.title.toLowerCase().includes(query) ||
+            e.description.toLowerCase().includes(query) ||
+            e.tags.some((t) => t.toLowerCase().includes(query)) ||
+            e.location.city.toLowerCase().includes(query)
+          );
+        }
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
       );
-    });
-  }, [events, searchQuery]);
+  }, [events, selectedCategory, searchQuery]);
 
   const onRefresh = useCallback(() => {
-    refetch();
-  }, [refetch]);
+    setRefreshing(true);
+    // Simulate refresh
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
   const handleEventPress = (eventId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -161,7 +176,7 @@ export default function EventsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
+              refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor="#a855f7"
             />
@@ -189,86 +204,108 @@ export default function EventsScreen() {
             </ScrollView>
           </Animated.View>
 
-          {/* Loading State */}
-          {isLoading && (
-            <View className="items-center py-12">
-              <ActivityIndicator size="large" color="#a855f7" />
-              <Text className="text-zinc-400 text-sm mt-4">Loading events...</Text>
-            </View>
+          {/* Featured Section */}
+          {featuredEvents.length > 0 && !searchQuery && !selectedCategory && (
+            <Animated.View
+              entering={FadeInDown.delay(200).duration(400)}
+              className="mb-6"
+            >
+              <View className="flex-row items-center justify-between px-5 mb-3">
+                <View className="flex-row items-center">
+                  <Sparkles size={18} color="#fbbf24" />
+                  <Text className="text-white text-lg font-bold ml-2">
+                    Featured
+                  </Text>
+                </View>
+                <Pressable className="flex-row items-center">
+                  <Text className="text-zinc-400 text-sm mr-1">See all</Text>
+                  <ChevronRight size={16} color="#71717a" />
+                </Pressable>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: 20 }}
+              >
+                {featuredEvents.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    variant="featured"
+                    onPress={() => handleEventPress(event.id)}
+                  />
+                ))}
+              </ScrollView>
+            </Animated.View>
+          )}
+
+          {/* Quick Actions */}
+          {!searchQuery && !selectedCategory && (
+            <Animated.View
+              entering={FadeInDown.delay(300).duration(400)}
+              className="flex-row px-5 mb-6"
+            >
+              <QuickActionButton
+                icon={<MapPin size={18} color="#60a5fa" />}
+                label="Near Me"
+                color="#60a5fa"
+                onPress={() => {}}
+              />
+              <QuickActionButton
+                icon={<Calendar size={18} color="#4ade80" />}
+                label="This Week"
+                color="#4ade80"
+                onPress={() => {}}
+              />
+            </Animated.View>
           )}
 
           {/* Events List */}
-          {!isLoading && (
-            <>
-              {/* Quick Actions */}
-              {!searchQuery && !selectedCategory && (
+          <Animated.View
+            entering={FadeInDown.delay(400).duration(400)}
+            className="px-5 pb-32"
+          >
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-white text-lg font-bold">
+                {selectedCategory
+                  ? EVENT_CATEGORIES.find((c) => c.id === selectedCategory)?.label
+                  : searchQuery
+                  ? 'Search Results'
+                  : 'Upcoming Events'}
+              </Text>
+              <Text className="text-zinc-500 text-sm">
+                {filteredEvents.length} events
+              </Text>
+            </View>
+
+            {filteredEvents.length === 0 ? (
+              <View className="items-center py-12">
+                <View className="w-16 h-16 rounded-full bg-zinc-800/50 items-center justify-center mb-4">
+                  <Calendar size={32} color="#52525b" />
+                </View>
+                <Text className="text-zinc-400 text-base font-medium mb-1">
+                  No events found
+                </Text>
+                <Text className="text-zinc-500 text-sm text-center px-8">
+                  Try adjusting your filters or check back later
+                </Text>
+              </View>
+            ) : (
+              filteredEvents.map((event, index) => (
                 <Animated.View
-                  entering={FadeInDown.delay(300).duration(400)}
-                  className="flex-row px-5 mb-6"
+                  key={event.id}
+                  entering={FadeInDown.delay(100 + index * 50).duration(400)}
+                  layout={Layout.springify()}
                 >
-                  <QuickActionButton
-                    icon={<MapPin size={18} color="#60a5fa" />}
-                    label="Near Me"
-                    color="#60a5fa"
-                    onPress={() => {}}
-                  />
-                  <QuickActionButton
-                    icon={<Calendar size={18} color="#4ade80" />}
-                    label="This Week"
-                    color="#4ade80"
-                    onPress={() => {}}
+                  <EventCard
+                    event={event}
+                    variant="default"
+                    onPress={() => handleEventPress(event.id)}
                   />
                 </Animated.View>
-              )}
-
-              {/* Events List */}
-              <Animated.View
-                entering={FadeInDown.delay(400).duration(400)}
-                className="px-5 pb-32"
-              >
-                <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-white text-lg font-bold">
-                    {selectedCategory
-                      ? EVENT_CATEGORIES.find((c) => c.id === selectedCategory)?.label
-                      : searchQuery
-                      ? 'Search Results'
-                      : 'Upcoming Events'}
-                  </Text>
-                  <Text className="text-zinc-500 text-sm">
-                    {filteredEvents.length} events
-                  </Text>
-                </View>
-
-                {filteredEvents.length === 0 ? (
-                  <View className="items-center py-12">
-                    <View className="w-16 h-16 rounded-full bg-zinc-800/50 items-center justify-center mb-4">
-                      <Calendar size={32} color="#52525b" />
-                    </View>
-                    <Text className="text-zinc-400 text-base font-medium mb-1">
-                      No events found
-                    </Text>
-                    <Text className="text-zinc-500 text-sm text-center px-8">
-                      Try adjusting your filters or check back later
-                    </Text>
-                  </View>
-                ) : (
-                  filteredEvents.map((event, index) => (
-                    <Animated.View
-                      key={event.id}
-                      entering={FadeInDown.delay(100 + index * 50).duration(400)}
-                      layout={Layout.springify()}
-                    >
-                      <EventCard
-                        event={event}
-                        variant="default"
-                        onPress={() => handleEventPress(event.id)}
-                      />
-                    </Animated.View>
-                  ))
-                )}
-              </Animated.View>
-            </>
-          )}
+              ))
+            )}
+          </Animated.View>
         </ScrollView>
       </SafeAreaView>
     </View>

@@ -428,6 +428,66 @@ export interface Database {
           updated_at?: string;
         };
       };
+      events: {
+        Row: {
+          id: string; // UUID
+          created_by: string; // UUID - FK to users
+          title: string;
+          description: string;
+          location: string | null;
+          event_date: string;
+          event_time: string | null;
+          max_attendees: number | null;
+          is_public: boolean;
+          image_path: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          created_by: string;
+          title: string;
+          description: string;
+          location?: string | null;
+          event_date: string;
+          event_time?: string | null;
+          max_attendees?: number | null;
+          is_public?: boolean;
+          image_path?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          title?: string;
+          description?: string;
+          location?: string | null;
+          event_date?: string;
+          event_time?: string | null;
+          max_attendees?: number | null;
+          is_public?: boolean;
+          image_path?: string | null;
+          updated_at?: string;
+        };
+      };
+      event_attendees: {
+        Row: {
+          id: string; // UUID
+          event_id: string; // UUID - FK to events
+          user_id: string; // UUID - FK to users
+          status: 'going' | 'interested' | 'not_going';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          user_id: string;
+          status?: 'going' | 'interested' | 'not_going';
+          created_at?: string;
+        };
+        Update: {
+          status?: 'going' | 'interested' | 'not_going';
+        };
+      };
       trust_scores: {
         Row: {
           id: string; // UUID
@@ -615,90 +675,121 @@ export interface Database {
           dwell_time_ms?: number;
         };
       };
-      events: {
+      game_sessions: {
         Row: {
-          id: string; // UUID
-          host_id: string; // UUID - FK to users
-          title: string;
-          description: string | null;
-          category: 'social' | 'dating' | 'education' | 'party' | 'outdoor' | 'wellness' | 'meetup' | 'virtual' | 'private' | 'community';
-          cover_photo_url: string | null;
-          location: string | null;
-          meeting_link: string | null;
-          start_time: string; // TIMESTAMPTZ
-          end_time: string; // TIMESTAMPTZ
-          timezone: string;
-          max_attendees: number | null;
-          visibility: 'public' | 'friends_only' | 'invite_only';
-          requires_approval: boolean;
-          tags: string[];
+          id: string;
+          thread_id: string;
+          game_type: 'truth_or_dare' | 'hot_seat' | 'story_chain' | 'mystery_date_planner' | 'compatibility_triangle' | 'group_challenge';
+          status: 'active' | 'paused' | 'completed' | 'cancelled';
+          current_turn_user_id: string | null;
+          turn_order: string[];
+          current_round: number;
+          max_rounds: number | null;
+          config: Record<string, unknown>;
+          game_state: Record<string, unknown>;
+          started_by: string;
+          started_at: string;
+          ended_at: string | null;
           created_at: string;
           updated_at: string;
-          cancelled_at: string | null;
         };
         Insert: {
           id?: string;
-          host_id: string;
-          title: string;
-          description?: string | null;
-          category: 'social' | 'dating' | 'education' | 'party' | 'outdoor' | 'wellness' | 'meetup' | 'virtual' | 'private' | 'community';
-          cover_photo_url?: string | null;
-          location?: string | null;
-          meeting_link?: string | null;
-          start_time: string;
-          end_time: string;
-          timezone?: string;
-          max_attendees?: number | null;
-          visibility?: 'public' | 'friends_only' | 'invite_only';
-          requires_approval?: boolean;
-          tags?: string[];
+          thread_id: string;
+          game_type: 'truth_or_dare' | 'hot_seat' | 'story_chain' | 'mystery_date_planner' | 'compatibility_triangle' | 'group_challenge';
+          status?: 'active' | 'paused' | 'completed' | 'cancelled';
+          current_turn_user_id?: string | null;
+          turn_order?: string[];
+          current_round?: number;
+          max_rounds?: number | null;
+          config?: Record<string, unknown>;
+          game_state?: Record<string, unknown>;
+          started_by: string;
+          started_at?: string;
+          ended_at?: string | null;
           created_at?: string;
           updated_at?: string;
-          cancelled_at?: string | null;
         };
         Update: {
-          title?: string;
-          description?: string | null;
-          category?: 'social' | 'dating' | 'education' | 'party' | 'outdoor' | 'wellness' | 'meetup' | 'virtual' | 'private' | 'community';
-          cover_photo_url?: string | null;
-          location?: string | null;
-          meeting_link?: string | null;
-          start_time?: string;
-          end_time?: string;
-          timezone?: string;
-          max_attendees?: number | null;
-          visibility?: 'public' | 'friends_only' | 'invite_only';
-          requires_approval?: boolean;
-          tags?: string[];
+          status?: 'active' | 'paused' | 'completed' | 'cancelled';
+          current_turn_user_id?: string | null;
+          turn_order?: string[];
+          current_round?: number;
+          max_rounds?: number | null;
+          config?: Record<string, unknown>;
+          game_state?: Record<string, unknown>;
+          ended_at?: string | null;
           updated_at?: string;
-          cancelled_at?: string | null;
         };
       };
-      event_rsvps: {
+      game_moves: {
         Row: {
-          id: string; // UUID
-          event_id: string; // UUID - FK to events
-          user_id: string; // UUID - FK to users
-          status: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
-          checked_in: boolean;
-          checked_in_at: string | null;
+          id: string;
+          game_session_id: string;
+          user_id: string;
+          move_type: string;
+          move_data: Record<string, unknown>;
+          round_number: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          game_session_id: string;
+          user_id: string;
+          move_type: string;
+          move_data?: Record<string, unknown>;
+          round_number: number;
+          created_at?: string;
+        };
+        Update: {
+          move_data?: Record<string, unknown>;
+        };
+      };
+      custom_game_content: {
+        Row: {
+          id: string;
+          created_by: string;
+          game_type: 'truth_or_dare' | 'hot_seat' | 'story_chain';
+          content_type: string;
+          content: string;
+          category: string | null;
+          difficulty: string | null;
+          for_couples: boolean;
+          for_singles: boolean;
+          theme: string | null;
+          times_used: number;
+          is_approved: boolean;
+          reported_count: number;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          event_id: string;
-          user_id: string;
-          status: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
-          checked_in?: boolean;
-          checked_in_at?: string | null;
+          created_by: string;
+          game_type: 'truth_or_dare' | 'hot_seat' | 'story_chain';
+          content_type: string;
+          content: string;
+          category?: string | null;
+          difficulty?: string | null;
+          for_couples?: boolean;
+          for_singles?: boolean;
+          theme?: string | null;
+          times_used?: number;
+          is_approved?: boolean;
+          reported_count?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
-          status?: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
-          checked_in?: boolean;
-          checked_in_at?: string | null;
+          content?: string;
+          category?: string | null;
+          difficulty?: string | null;
+          for_couples?: boolean;
+          for_singles?: boolean;
+          theme?: string | null;
+          times_used?: number;
+          is_approved?: boolean;
+          reported_count?: number;
           updated_at?: string;
         };
       };
@@ -712,48 +803,6 @@ export interface Database {
     };
     Enums: Record<string, never>;
   };
-}
-
-// ============================================================================
-// EVENT TYPES
-// ============================================================================
-
-export type DbEvent = Database['public']['Tables']['events']['Row'];
-export type DbEventInsert = Database['public']['Tables']['events']['Insert'];
-export type DbEventUpdate = Database['public']['Tables']['events']['Update'];
-
-export type DbEventRsvp = Database['public']['Tables']['event_rsvps']['Row'];
-export type DbEventRsvpInsert = Database['public']['Tables']['event_rsvps']['Insert'];
-export type DbEventRsvpUpdate = Database['public']['Tables']['event_rsvps']['Update'];
-
-// Event with host profile information
-export interface EventWithHost extends DbEvent {
-  host?: {
-    id: string;
-    user_id: string;
-    display_name: string;
-    photo_url?: string | null;
-  };
-  rsvp_counts?: {
-    going: number;
-    maybe: number;
-    waitlist: number;
-    pending: number;
-  };
-  user_rsvp?: DbEventRsvp | null;
-}
-
-// Event with RSVP details
-export interface EventWithRsvps extends EventWithHost {
-  rsvps?: Array<
-    DbEventRsvp & {
-      user?: {
-        id: string;
-        display_name: string;
-        photo_url?: string | null;
-      };
-    }
-  >;
 }
 
 // Helper types for easier usage
@@ -784,3 +833,26 @@ export type DateReviewRow = Tables<'date_reviews'>;
 export type CommunityVouchRow = Tables<'community_vouches'>;
 export type UserTasteProfileRow = Tables<'user_taste_profiles'>;
 export type ProfileViewRow = Tables<'profile_views'>;
+export type GameSession = Tables<'game_sessions'>;
+export type GameMove = Tables<'game_moves'>;
+export type CustomGameContent = Tables<'custom_game_content'>;
+
+// Game-specific config types
+export interface TruthOrDareConfig {
+  difficulty: 'playful' | 'flirty' | 'intimate';
+  allowSkips: boolean;
+}
+
+export interface HotSeatConfig {
+  questionTimeLimit: number; // seconds
+  hotSeatDuration: number; // seconds
+}
+
+export interface StoryChainConfig {
+  theme: 'romantic' | 'adventure' | 'fantasy' | 'funny';
+  sentenceLimit: number;
+}
+
+// Game types
+export type GameType = 'truth_or_dare' | 'hot_seat' | 'story_chain' | 'mystery_date_planner' | 'compatibility_triangle' | 'group_challenge';
+export type GameStatus = 'active' | 'paused' | 'completed' | 'cancelled';

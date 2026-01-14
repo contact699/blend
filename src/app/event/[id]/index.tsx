@@ -8,7 +8,6 @@ import {
   Dimensions,
   Share,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,9 +45,9 @@ import {
   Sparkles,
   Shield,
 } from 'lucide-react-native';
+import useDatingStore from '@/lib/state/dating-store';
 import { EVENT_CATEGORIES } from '@/lib/mock-events';
 import { RSVPStatus } from '@/lib/types';
-import { useEvent, useRsvp, useCancelRsvp, useCurrentUser } from '@/lib/supabase/hooks';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HEADER_HEIGHT = 320;
@@ -58,20 +57,22 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export default function EventDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: currentUser } = useCurrentUser();
-  const { data: event, isLoading } = useEvent(id);
-  const rsvpMutation = useRsvp();
-  const cancelRsvpMutation = useCancelRsvp();
+  const events = useDatingStore((s) => s.events);
+  const currentUserId = useDatingStore((s) => s.currentUserId);
+  const rsvpToEvent = useDatingStore((s) => s.rsvpToEvent);
+  const cancelRSVP = useDatingStore((s) => s.cancelRSVP);
+  const getUserRSVPStatus = useDatingStore((s) => s.getUserRSVPStatus);
 
-  const isHost = event?.host_id === currentUser?.id;
-  const userRSVP = event?.user_rsvp?.status;
+  const event = useMemo(() => events.find((e) => e.id === id), [events, id]);
+  const userRSVP = id ? getUserRSVPStatus(id) : null;
+  const isHost = event?.host_id === currentUserId;
 
   const scrollY = useSharedValue(0);
   const [showRSVPOptions, setShowRSVPOptions] = useState(false);
 
   const category = EVENT_CATEGORIES.find((c) => c.id === event?.category);
-  const spotsLeft = event?.max_attendees && event?.rsvp_counts
-    ? event.max_attendees - event.rsvp_counts.going
+  const spotsLeft = event?.max_attendees
+    ? event.max_attendees - event.current_attendees
     : null;
   const isFull = spotsLeft !== null && spotsLeft <= 0;
 
@@ -111,8 +112,8 @@ export default function EventDetailScreen() {
     ),
   }));
 
-  const formatDate = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
@@ -121,43 +122,32 @@ export default function EventDetailScreen() {
     });
   };
 
-  const formatTime = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours ?? '0', 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
-  const handleRSVP = async (status: RSVPStatus) => {
+  const handleRSVP = (status: RSVPStatus) => {
     if (!id) return;
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await rsvpMutation.mutateAsync({ eventId: id, status });
-      setShowRSVPOptions(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to RSVP. Please try again.');
-    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    rsvpToEvent(id, status);
+    setShowRSVPOptions(false);
   };
 
-  const handleCancelRSVP = async () => {
+  const handleCancelRSVP = () => {
     if (!id) return;
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await cancelRsvpMutation.mutateAsync(id);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to cancel RSVP. Please try again.');
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    cancelRSVP(id);
   };
 
   const handleShare = async () => {
     if (!event) return;
     try {
-      const startDate = new Date(event.start_time).toLocaleDateString();
-      const startTime = new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       await Share.share({
-        message: `Check out this event: ${event.title}\n${startDate} at ${startTime}`,
+        message: `Check out this event: ${event.title}\n${formatDate(event.start_date)} at ${formatTime(event.start_time)}`,
       });
     } catch (error) {
       console.log(error);
@@ -182,15 +172,6 @@ export default function EventDetailScreen() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-black items-center justify-center">
-        <ActivityIndicator size="large" color="#a855f7" />
-        <Text className="text-zinc-400 text-sm mt-4">Loading event...</Text>
-      </View>
-    );
-  }
-
   if (!event) {
     return (
       <View className="flex-1 bg-black items-center justify-center">
@@ -198,6 +179,8 @@ export default function EventDetailScreen() {
       </View>
     );
   }
+
+  const goingAttendees = event.attendees.filter((a) => a.rsvp_status === 'going');
 
   return (
     <View className="flex-1 bg-black">
@@ -269,7 +252,7 @@ export default function EventDetailScreen() {
         {/* Cover Image */}
         <Animated.View style={[headerImageStyle, { height: HEADER_HEIGHT }]}>
           <Image
-            source={{ uri: event.cover_photo_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800' }}
+            source={{ uri: event.cover_image }}
             style={{ width: SCREEN_WIDTH, height: HEADER_HEIGHT }}
             resizeMode="cover"
           />
@@ -287,7 +270,15 @@ export default function EventDetailScreen() {
           {/* Badges */}
           <View className="absolute bottom-4 left-5 right-5">
             <View className="flex-row flex-wrap">
-              {event.meeting_link && (
+              {event.is_featured && (
+                <View className="flex-row items-center bg-amber-500/20 px-3 py-1.5 rounded-full mr-2 mb-2 border border-amber-500/30">
+                  <Sparkles size={12} color="#fbbf24" />
+                  <Text className="text-amber-400 text-xs font-semibold ml-1">
+                    Featured
+                  </Text>
+                </View>
+              )}
+              {event.location.is_virtual && (
                 <View className="flex-row items-center bg-purple-500/20 px-3 py-1.5 rounded-full mr-2 mb-2 border border-purple-500/30">
                   <Video size={12} color="#a855f7" />
                   <Text className="text-purple-400 text-xs font-semibold ml-1">
@@ -365,18 +356,6 @@ export default function EventDetailScreen() {
             </View>
 
             <View className="flex-row items-start mb-4">
-              <View className="w-10 h-10 rounded-xl bg-purple-500/20 items-center justify-center">
-                <Calendar size={20} color="#a855f7" />
-              </View>
-              <View className="flex-1 ml-3">
-                <Text className="text-zinc-400 text-xs mb-0.5">Date</Text>
-                <Text className="text-white font-medium">
-                  {formatDate(event.start_time)}
-                </Text>
-              </View>
-            </View>
-
-            <View className="flex-row items-start mb-4">
               <View className="w-10 h-10 rounded-xl bg-blue-500/20 items-center justify-center">
                 <Clock size={20} color="#60a5fa" />
               </View>
@@ -395,14 +374,10 @@ export default function EventDetailScreen() {
               </View>
               <View className="flex-1 ml-3">
                 <Text className="text-zinc-400 text-xs mb-0.5">Location</Text>
-                <Text className="text-white font-medium">
-                  {event.meeting_link ? 'Virtual Event' : event.location || 'TBD'}
+                <Text className="text-white font-medium">{event.location.name}</Text>
+                <Text className="text-zinc-500 text-sm">
+                  {event.location.address}, {event.location.city}
                 </Text>
-                {event.meeting_link && (
-                  <Text className="text-purple-400 text-sm">
-                    Online Meeting
-                  </Text>
-                )}
               </View>
             </View>
           </Animated.View>
@@ -418,19 +393,50 @@ export default function EventDetailScreen() {
                 <Text className="text-white font-semibold ml-2">Attendees</Text>
               </View>
               <Text className="text-zinc-400">
-                {event.rsvp_counts?.going || 0}
+                {event.current_attendees}
                 {event.max_attendees && ` / ${event.max_attendees}`}
               </Text>
             </View>
 
+            {/* Attendee Avatars */}
+            <View className="flex-row items-center">
+              {goingAttendees.slice(0, 5).map((attendee, index) => (
+                <View
+                  key={attendee.id}
+                  style={{ marginLeft: index > 0 ? -12 : 0, zIndex: 5 - index }}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        attendee.photo ||
+                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+                    }}
+                    className="w-10 h-10 rounded-full border-2 border-zinc-900"
+                  />
+                </View>
+              ))}
+              {goingAttendees.length > 5 && (
+                <View className="w-10 h-10 rounded-full bg-zinc-800 items-center justify-center border-2 border-zinc-900 -ml-3">
+                  <Text className="text-zinc-400 text-xs font-medium">
+                    +{goingAttendees.length - 5}
+                  </Text>
+                </View>
+              )}
+              {goingAttendees.length === 0 && (
+                <Text className="text-zinc-500 text-sm">
+                  Be the first to join!
+                </Text>
+              )}
+            </View>
+
             {/* Spots indicator */}
-            {event.max_attendees && event.rsvp_counts && (
+            {event.max_attendees && (
               <View className="mt-3">
                 <View className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                   <View
                     className="h-full rounded-full"
                     style={{
-                      width: `${(event.rsvp_counts.going / event.max_attendees) * 100}%`,
+                      width: `${(event.current_attendees / event.max_attendees) * 100}%`,
                       backgroundColor: isFull
                         ? '#ef4444'
                         : spotsLeft && spotsLeft <= 5
