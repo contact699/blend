@@ -6,7 +6,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingExistingSession, setCheckingExistingSession] = useState(true);
+  const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
 
   // Check for existing session on mount - handle partial login states
   useEffect(() => {
@@ -117,11 +118,7 @@ export default function AuthScreen() {
             // Auto-confirmed, go to onboarding
             router.replace('/onboarding');
           } else {
-            Alert.alert(
-              'Check your email',
-              'We sent you a confirmation link. Please confirm your email to continue.',
-              [{ text: 'OK' }]
-            );
+            setShowEmailConfirmModal(true);
           }
         }
       } else {
@@ -305,6 +302,52 @@ export default function AuthScreen() {
             </View>
           </KeyboardAvoidingView>
           )}
+
+          {/* Email Confirmation Modal */}
+          <Modal
+            transparent
+            visible={showEmailConfirmModal}
+            animationType="fade"
+            onRequestClose={() => setShowEmailConfirmModal(false)}
+          >
+            <View className="flex-1 bg-black/70 items-center justify-center px-6">
+              <View className="bg-zinc-900 rounded-2xl p-6 w-full max-w-sm border border-zinc-800">
+                <View className="items-center mb-4">
+                  <View className="w-16 h-16 rounded-full items-center justify-center mb-4 overflow-hidden">
+                    <LinearGradient
+                      colors={['#9333ea', '#db2777']}
+                      style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 32,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Mail size={32} color="white" />
+                    </LinearGradient>
+                  </View>
+                  <Text className="text-white text-xl font-bold mb-2">Check your email</Text>
+                  <Text className="text-gray-400 text-center">
+                    We sent you a confirmation link. Please confirm your email to continue.
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setShowEmailConfirmModal(false)}
+                  className="mt-4 rounded-xl overflow-hidden"
+                >
+                  <LinearGradient
+                    colors={['#9333ea', '#db2777']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ paddingVertical: 14 }}
+                  >
+                    <Text className="text-white font-semibold text-center">OK</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </LinearGradient>
     </View>
