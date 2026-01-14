@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   virtual_only BOOLEAN DEFAULT false,
   response_style TEXT DEFAULT 'relaxed' CHECK (response_style IN ('quick', 'relaxed')),
   voice_intro_url TEXT,
+  -- Location coordinates with reduced precision for privacy (~1.1 km accuracy)
+  -- IMPORTANT: Store only 2-4 decimal places to prevent exact location tracking
+  -- Application should further fuzz coordinates when displaying on map
   latitude DECIMAL(10, 8), -- Fuzzy location for privacy (approximate area, not exact)
   longitude DECIMAL(11, 8), -- Fuzzy location for privacy (approximate area, not exact)
   show_on_map BOOLEAN DEFAULT true, -- Privacy setting: show profile on map view
