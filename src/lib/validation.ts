@@ -373,3 +373,66 @@ export function isSecureInput(input: string): {
   }
   return { secure: true };
 }
+
+// ============================================================================
+// GAME VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Game type schema
+ */
+export const gameTypeSchema = z.enum([
+  'truth_or_dare',
+  'hot_seat',
+  'story_chain',
+  'mystery_date_planner',
+  'compatibility_triangle',
+  'group_challenge',
+]);
+
+/**
+ * Game status schema
+ */
+export const gameStatusSchema = z.enum(['active', 'paused', 'completed', 'cancelled']);
+
+/**
+ * Custom game content schema
+ */
+export const createCustomGameContentSchema = z.object({
+  game_type: z.enum(['truth_or_dare', 'hot_seat', 'story_chain']),
+  content_type: z.string().min(1).max(50).transform(sanitizeText),
+  content: z.string().min(5).max(500).transform(sanitizeMultilineText),
+  category: z.string().max(50).transform(sanitizeText).optional(),
+  difficulty: z.string().max(50).transform(sanitizeText).optional(),
+  for_couples: z.boolean().optional().default(false),
+  for_singles: z.boolean().optional().default(true),
+  theme: z.string().max(50).transform(sanitizeText).optional(),
+});
+
+/**
+ * Start game schema
+ */
+export const startGameSchema = z.object({
+  thread_id: uuidSchema,
+  game_type: gameTypeSchema,
+  config: z.record(z.unknown()).default({}),
+  turn_order: z.array(uuidSchema).min(2).max(20),
+});
+
+/**
+ * Submit game move schema
+ */
+export const submitGameMoveSchema = z.object({
+  game_session_id: uuidSchema,
+  move_type: z.string().min(1).max(50).transform(sanitizeText),
+  move_data: z.record(z.unknown()).default({}),
+  round_number: z.number().int().min(1),
+});
+
+/**
+ * Update game state schema
+ */
+export const updateGameStateSchema = z.object({
+  game_session_id: uuidSchema,
+  game_state: z.record(z.unknown()),
+});

@@ -11,6 +11,10 @@ import {
   createReportSchema,
   blockUserSchema,
   uuidSchema,
+  createCustomGameContentSchema,
+  startGameSchema,
+  submitGameMoveSchema,
+  updateGameStateSchema,
 } from '../validation';
 import {
   getSignedPhotoUrls,
@@ -2015,16 +2019,24 @@ export function useStartGame() {
     }) => {
       if (!profile?.id) throw new Error('No profile');
 
+      // Validate input
+      const validated = validateOrThrow(startGameSchema, {
+        thread_id: input.threadId,
+        game_type: input.gameType,
+        config: input.config,
+        turn_order: input.turnOrder,
+      });
+
       const { data, error } = await supabase
         .from('game_sessions')
         .insert({
-          thread_id: input.threadId,
-          game_type: input.gameType as any,
+          thread_id: validated.thread_id,
+          game_type: validated.game_type as any,
           status: 'active',
-          config: input.config,
+          config: validated.config,
           game_state: {},
-          turn_order: input.turnOrder,
-          current_turn_user_id: input.turnOrder[0] ?? null,
+          turn_order: validated.turn_order,
+          current_turn_user_id: validated.turn_order[0] ?? null,
           started_by: profile.id,
         })
         .select()
@@ -2157,14 +2169,22 @@ export function useSubmitMove() {
     }) => {
       if (!profile?.id) throw new Error('No profile');
 
+      // Validate input
+      const validated = validateOrThrow(submitGameMoveSchema, {
+        game_session_id: input.gameSessionId,
+        move_type: input.moveType,
+        move_data: input.moveData,
+        round_number: input.roundNumber,
+      });
+
       const { data, error } = await supabase
         .from('game_moves')
         .insert({
-          game_session_id: input.gameSessionId,
+          game_session_id: validated.game_session_id,
           user_id: profile.id,
-          move_type: input.moveType,
-          move_data: input.moveData,
-          round_number: input.roundNumber,
+          move_type: validated.move_type,
+          move_data: validated.move_data,
+          round_number: validated.round_number,
         })
         .select()
         .single();
@@ -2240,10 +2260,16 @@ export function useUpdateGameState() {
       gameSessionId: string;
       gameState: Record<string, unknown>;
     }) => {
+      // Validate input
+      const validated = validateOrThrow(updateGameStateSchema, {
+        game_session_id: input.gameSessionId,
+        game_state: input.gameState,
+      });
+
       const { data, error } = await supabase
         .from('game_sessions')
-        .update({ game_state: input.gameState })
-        .eq('id', input.gameSessionId)
+        .update({ game_state: validated.game_state })
+        .eq('id', validated.game_session_id)
         .select()
         .single();
 
@@ -2325,18 +2351,30 @@ export function useCreateCustomContent() {
     }) => {
       if (!profile?.id) throw new Error('No profile');
 
+      // Validate input
+      const validated = validateOrThrow(createCustomGameContentSchema, {
+        game_type: input.gameType,
+        content_type: input.contentType,
+        content: input.content,
+        category: input.category,
+        difficulty: input.difficulty,
+        for_couples: input.forCouples,
+        for_singles: input.forSingles,
+        theme: input.theme,
+      });
+
       const { data, error } = await supabase
         .from('custom_game_content')
         .insert({
           created_by: profile.id,
-          game_type: input.gameType,
-          content_type: input.contentType,
-          content: input.content,
-          category: input.category ?? null,
-          difficulty: input.difficulty ?? null,
-          for_couples: input.forCouples ?? false,
-          for_singles: input.forSingles ?? true,
-          theme: input.theme ?? null,
+          game_type: validated.game_type,
+          content_type: validated.content_type,
+          content: validated.content,
+          category: validated.category ?? null,
+          difficulty: validated.difficulty ?? null,
+          for_couples: validated.for_couples,
+          for_singles: validated.for_singles,
+          theme: validated.theme ?? null,
         })
         .select()
         .single();
