@@ -55,6 +55,8 @@ export default function RootLayout() {
               <Stack.Screen name="sti-safety" />
               <Stack.Screen name="consent-checklist" />
               <Stack.Screen name="trust-profile" />
+              <Stack.Screen name="taste-profile" />
+              <Stack.Screen name="link-partner" options={{ presentation: 'modal' }} />
               <Stack.Screen name="leave-review" options={{ presentation: 'modal' }} />
               <Stack.Screen name="vouch-user" options={{ presentation: 'modal' }} />
               <Stack.Screen name="search" options={{ presentation: 'modal' }} />
