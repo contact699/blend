@@ -11,12 +11,26 @@ import {
   createReportSchema,
   blockUserSchema,
   uuidSchema,
+  createEventSchema,
+  updateEventSchema,
+  createRsvpSchema,
+  updateRsvpSchema,
 } from '../validation';
 import {
   getSignedPhotoUrls,
   securePhotoUpload,
   deletePhoto,
 } from './photos';
+import {
+  secureEventPhotoUpload,
+  getSignedEventPhotoUrl,
+} from './event-photos';
+import {
+  DbEvent,
+  DbEventRsvp,
+  EventWithHost,
+  EventWithRsvps,
+} from './types';
 
 // ============================================================================
 // TYPES
@@ -1949,24 +1963,6 @@ export function useRefreshTasteProfile() {
 // ============================================================================
 // EVENT HOOKS
 // ============================================================================
-
-import {
-  DbEvent,
-  DbEventRsvp,
-  EventWithHost,
-  EventWithRsvps,
-} from './types';
-import {
-  createEventSchema,
-  updateEventSchema,
-  createRsvpSchema,
-  updateRsvpSchema,
-  uuidSchema as eventUuidSchema,
-} from '../validation';
-import {
-  secureEventPhotoUpload,
-  getSignedEventPhotoUrl,
-} from './event-photos';
 
 /**
  * Hook to fetch events with optional filters
