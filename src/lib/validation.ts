@@ -290,6 +290,140 @@ export const linkedPartnerSchema = z.object({
 });
 
 // ============================================================================
+// EVENT SCHEMAS
+// ============================================================================
+
+/**
+ * Event category validation
+ */
+export const eventCategorySchema = z.enum([
+  'social',
+  'dating',
+  'education',
+  'party',
+  'outdoor',
+  'wellness',
+  'meetup',
+  'virtual',
+  'private',
+  'community',
+]);
+
+/**
+ * Event visibility validation
+ */
+export const eventVisibilitySchema = z.enum(['public', 'friends_only', 'invite_only']);
+
+/**
+ * RSVP status validation
+ */
+export const rsvpStatusSchema = z.enum(['going', 'maybe', 'waitlist', 'pending', 'declined']);
+
+/**
+ * Event title validation
+ */
+export const eventTitleSchema = z
+  .string()
+  .min(1, 'Title is required')
+  .max(100, 'Title must be 100 characters or less')
+  .transform(sanitizeText);
+
+/**
+ * Event description validation
+ */
+export const eventDescriptionSchema = z
+  .string()
+  .max(2000, 'Description must be 2000 characters or less')
+  .transform(sanitizeMultilineText)
+  .optional();
+
+/**
+ * Event location validation
+ */
+export const eventLocationSchema = z
+  .string()
+  .max(200, 'Location must be 200 characters or less')
+  .transform(sanitizeText)
+  .optional();
+
+/**
+ * Event meeting link validation
+ */
+export const eventMeetingLinkSchema = z
+  .string()
+  .url('Must be a valid URL')
+  .max(500, 'Link must be 500 characters or less')
+  .optional();
+
+/**
+ * Event timezone validation
+ */
+export const eventTimezoneSchema = z.string().default('UTC');
+
+/**
+ * Event tags validation
+ */
+export const eventTagsSchema = z
+  .array(z.string().max(50).transform(sanitizeText))
+  .max(10, 'Maximum 10 tags allowed')
+  .optional()
+  .default([]);
+
+/**
+ * Event creation schema
+ */
+export const createEventSchema = z.object({
+  title: eventTitleSchema,
+  description: eventDescriptionSchema,
+  category: eventCategorySchema,
+  cover_photo_url: z.string().url().optional(),
+  location: eventLocationSchema,
+  meeting_link: eventMeetingLinkSchema,
+  start_time: z.string().datetime('Invalid start time format'),
+  end_time: z.string().datetime('Invalid end time format'),
+  timezone: eventTimezoneSchema,
+  max_attendees: z.number().int().positive().nullable().optional(),
+  visibility: eventVisibilitySchema.optional().default('public'),
+  requires_approval: z.boolean().optional().default(false),
+  tags: eventTagsSchema,
+}).refine((data) => new Date(data.end_time) > new Date(data.start_time), {
+  message: 'End time must be after start time',
+  path: ['end_time'],
+});
+
+/**
+ * Event update schema (all fields optional except validation)
+ */
+export const updateEventSchema = createEventSchema.partial().refine(
+  (data) => {
+    if (data.start_time && data.end_time) {
+      return new Date(data.end_time) > new Date(data.start_time);
+    }
+    return true;
+  },
+  {
+    message: 'End time must be after start time',
+    path: ['end_time'],
+  }
+);
+
+/**
+ * RSVP creation schema
+ */
+export const createRsvpSchema = z.object({
+  event_id: uuidSchema,
+  status: rsvpStatusSchema,
+});
+
+/**
+ * RSVP update schema
+ */
+export const updateRsvpSchema = z.object({
+  status: rsvpStatusSchema.optional(),
+  checked_in: z.boolean().optional(),
+});
+
+// ============================================================================
 // VALIDATION HELPERS
 // ============================================================================
 

@@ -675,6 +675,93 @@ export interface Database {
           dwell_time_ms?: number;
         };
       };
+      events: {
+        Row: {
+          id: string; // UUID
+          host_id: string; // UUID - FK to users
+          title: string;
+          description: string | null;
+          category: 'social' | 'dating' | 'education' | 'party' | 'outdoor' | 'wellness' | 'meetup' | 'virtual' | 'private' | 'community';
+          cover_photo_url: string | null;
+          location: string | null;
+          meeting_link: string | null;
+          start_time: string; // TIMESTAMPTZ
+          end_time: string; // TIMESTAMPTZ
+          timezone: string;
+          max_attendees: number | null;
+          visibility: 'public' | 'friends_only' | 'invite_only';
+          requires_approval: boolean;
+          tags: string[];
+          created_at: string;
+          updated_at: string;
+          cancelled_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          host_id: string;
+          title: string;
+          description?: string | null;
+          category: 'social' | 'dating' | 'education' | 'party' | 'outdoor' | 'wellness' | 'meetup' | 'virtual' | 'private' | 'community';
+          cover_photo_url?: string | null;
+          location?: string | null;
+          meeting_link?: string | null;
+          start_time: string;
+          end_time: string;
+          timezone?: string;
+          max_attendees?: number | null;
+          visibility?: 'public' | 'friends_only' | 'invite_only';
+          requires_approval?: boolean;
+          tags?: string[];
+          created_at?: string;
+          updated_at?: string;
+          cancelled_at?: string | null;
+        };
+        Update: {
+          title?: string;
+          description?: string | null;
+          category?: 'social' | 'dating' | 'education' | 'party' | 'outdoor' | 'wellness' | 'meetup' | 'virtual' | 'private' | 'community';
+          cover_photo_url?: string | null;
+          location?: string | null;
+          meeting_link?: string | null;
+          start_time?: string;
+          end_time?: string;
+          timezone?: string;
+          max_attendees?: number | null;
+          visibility?: 'public' | 'friends_only' | 'invite_only';
+          requires_approval?: boolean;
+          tags?: string[];
+          updated_at?: string;
+          cancelled_at?: string | null;
+        };
+      };
+      event_rsvps: {
+        Row: {
+          id: string; // UUID
+          event_id: string; // UUID - FK to events
+          user_id: string; // UUID - FK to users
+          status: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
+          checked_in: boolean;
+          checked_in_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          user_id: string;
+          status: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
+          checked_in?: boolean;
+          checked_in_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: 'going' | 'maybe' | 'waitlist' | 'pending' | 'declined';
+          checked_in?: boolean;
+          checked_in_at?: string | null;
+          updated_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -685,6 +772,48 @@ export interface Database {
     };
     Enums: Record<string, never>;
   };
+}
+
+// ============================================================================
+// EVENT TYPES
+// ============================================================================
+
+export type DbEvent = Database['public']['Tables']['events']['Row'];
+export type DbEventInsert = Database['public']['Tables']['events']['Insert'];
+export type DbEventUpdate = Database['public']['Tables']['events']['Update'];
+
+export type DbEventRsvp = Database['public']['Tables']['event_rsvps']['Row'];
+export type DbEventRsvpInsert = Database['public']['Tables']['event_rsvps']['Insert'];
+export type DbEventRsvpUpdate = Database['public']['Tables']['event_rsvps']['Update'];
+
+// Event with host profile information
+export interface EventWithHost extends DbEvent {
+  host?: {
+    id: string;
+    user_id: string;
+    display_name: string;
+    photo_url?: string | null;
+  };
+  rsvp_counts?: {
+    going: number;
+    maybe: number;
+    waitlist: number;
+    pending: number;
+  };
+  user_rsvp?: DbEventRsvp | null;
+}
+
+// Event with RSVP details
+export interface EventWithRsvps extends EventWithHost {
+  rsvps?: Array<
+    DbEventRsvp & {
+      user?: {
+        id: string;
+        display_name: string;
+        photo_url?: string | null;
+      };
+    }
+  >;
 }
 
 // Helper types for easier usage
