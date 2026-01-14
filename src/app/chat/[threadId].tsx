@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   EyeOff,
   User,
+  Video,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser, useThreadMessages, useSendMessage, supabase } from '@/lib/supabase';
@@ -30,6 +31,8 @@ import { getSignedPhotoUrls } from '@/lib/supabase/photos';
 import { cn } from '@/lib/cn';
 import { FIRST_MESSAGE_PROMPTS } from '@/lib/mock-data';
 import { FirstMessagePrompt } from '@/lib/types';
+import IncomingCallModal from '@/components/IncomingCallModal';
+import { useIncomingCall } from '@/lib/hooks/useIncomingCall';
 
 type FirstMessageMode = 'select' | 'prompt' | 'reaction' | 'voice' | null;
 
@@ -63,6 +66,9 @@ export default function ChatScreen() {
   const { data: currentUser } = useCurrentUser();
   const { data: messages, isLoading: messagesLoading } = useThreadMessages(threadId);
   const sendMessageMutation = useSendMessage();
+
+  // Incoming call detection
+  const { incomingCall, acceptCall, declineCall } = useIncomingCall(currentUser?.id || null);
 
   const [messageText, setMessageText] = useState('');
   const [firstMessageMode, setFirstMessageMode] = useState<FirstMessageMode>(null);
@@ -261,7 +267,7 @@ export default function ChatScreen() {
                   <User size={20} color="#6b7280" />
                 </View>
               )}
-              <View className="ml-3">
+              <View className="ml-3 flex-1">
                 <Text className="text-white font-semibold text-base">
                   {otherProfile.display_name}
                 </Text>
@@ -273,6 +279,23 @@ export default function ChatScreen() {
                 </View>
               </View>
             </View>
+
+            {/* Video Call Button */}
+            <Pressable
+              onPress={() => {
+                router.push({
+                  pathname: '/video-call',
+                  params: {
+                    threadId,
+                    participantId: otherProfile.user_id,
+                    participantName: otherProfile.display_name,
+                  },
+                });
+              }}
+              className="w-10 h-10 rounded-full bg-purple-500/20 items-center justify-center border border-purple-500/30 ml-2"
+            >
+              <Video size={20} color="#a855f7" />
+            </Pressable>
           </View>
 
           {/* Security Banner */}
@@ -537,6 +560,21 @@ export default function ChatScreen() {
             </KeyboardAvoidingView>
           )}
         </SafeAreaView>
+
+        {/* Incoming Call Modal */}
+        {incomingCall && (
+          <IncomingCallModal
+            visible={!!incomingCall}
+            callerName={incomingCall.callerName}
+            callerPhoto={incomingCall.callerPhoto}
+            callId={incomingCall.callId}
+            offerSdp={incomingCall.offerSdp}
+            callerId={incomingCall.callerId}
+            threadId={incomingCall.threadId}
+            onAccept={acceptCall}
+            onDecline={declineCall}
+          />
+        )}
       </LinearGradient>
     </View>
   );
