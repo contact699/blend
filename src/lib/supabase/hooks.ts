@@ -17,12 +17,14 @@ import {
   securePhotoUpload,
   deletePhoto,
 } from './photos';
+import { transformProfiles, SupabaseProfile } from './adapters';
+import type { Profile } from '../types';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-interface Profile {
+interface ProfileDB {
   id: string;
   user_id: string;
   display_name: string;
@@ -76,7 +78,8 @@ interface Message {
   mediaSignedUrl?: string | null;
 }
 
-interface ProfileWithRelations extends Profile {
+// ProfileWithRelations is what Supabase returns (before transformation)
+interface ProfileWithRelations extends ProfileDB {
   photos?: Photo[];
   profile_intents?: { intent_id: string }[];
   prompt_responses?: Array<{
@@ -1327,7 +1330,11 @@ export function useDiscoverProfiles() {
 
       console.log(`[Discover] Profiles with visible photos: ${profilesWithPhotos.length}`);
 
-      return profilesWithPhotos;
+      // Transform Supabase profiles to App Profile type
+      const transformedProfiles = transformProfiles(profilesWithPhotos as unknown as SupabaseProfile[]);
+      console.log(`[Discover] Transformed profiles: ${transformedProfiles.length}`);
+
+      return transformedProfiles;
     },
     enabled: !!user,
   });

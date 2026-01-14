@@ -12,12 +12,15 @@ import {
   Search,
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
-import { MOCK_PROFILES } from '@/lib/mock-data';
+import { useDiscoverProfiles } from '@/lib/supabase';
 import { Profile } from '@/lib/types';
 import { cn } from '@/lib/cn';
 
 export default function CreateGroupScreen() {
   const router = useRouter();
+
+  // Fetch profiles from Supabase
+  const { data: profiles = [] } = useDiscoverProfiles();
 
   const currentUserId = useDatingStore((s) => s.currentUserId);
   const matches = useDatingStore((s) => s.matches);
@@ -37,9 +40,9 @@ export default function CreateGroupScreen() {
 
     return activeMatches.map((match) => {
       const otherUserId = match.user_1_id === currentUserId ? match.user_2_id : match.user_1_id;
-      return MOCK_PROFILES.find((p: Profile) => p.user_id === otherUserId);
+      return profiles.find((p: Profile) => p.user_id === otherUserId);
     }).filter((p): p is Profile => p !== undefined);
-  }, [matches, threads, currentUserId]);
+  }, [matches, threads, currentUserId, profiles]);
 
   // Filter by search
   const filteredParticipants = useMemo(() => {
@@ -61,7 +64,7 @@ export default function CreateGroupScreen() {
     if (selectedParticipants.length < 2) return;
 
     const name = groupName.trim() || selectedParticipants
-      .map((id) => MOCK_PROFILES.find((p: Profile) => p.user_id === id)?.display_name)
+      .map((id) => profiles.find((p: Profile) => p.user_id === id)?.display_name)
       .filter(Boolean)
       .join(', ');
 
@@ -233,7 +236,7 @@ export default function CreateGroupScreen() {
                 >
                   <View className="flex-row">
                     {selectedParticipants.map((userId) => {
-                      const participant = MOCK_PROFILES.find(
+                      const participant = profiles.find(
                         (p: Profile) => p.user_id === userId
                       );
                       if (!participant) return null;

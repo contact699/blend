@@ -25,7 +25,7 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 import { PolyculeConnection, Profile } from '@/lib/types';
-import { MOCK_PROFILES } from '@/lib/mock-data';
+import { useDiscoverProfiles } from '@/lib/supabase';
 
 interface PartnerProfileModalProps {
   visible: boolean;
@@ -42,11 +42,14 @@ export default function PartnerProfileModal({
   onViewFullProfile,
   onMessage,
 }: PartnerProfileModalProps) {
+  // Fetch profiles from Supabase
+  const { data: profiles = [] } = useDiscoverProfiles();
+  
   if (!member) return null;
 
   // Get the full profile if on Blend
   const fullProfile = member.blend_user_id
-    ? MOCK_PROFILES.find((p: Profile) => p.user_id === member.blend_user_id)
+    ? profiles.find((p: Profile) => p.user_id === member.blend_user_id)
     : null;
 
   const getRelationshipLabel = () => {

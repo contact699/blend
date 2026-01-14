@@ -14,22 +14,9 @@ import useDatingStore from '@/lib/state/dating-store';
 import { CompatibilityPill } from '@/components/CompatibilityBadge';
 import { MatchHighlights } from '@/components/MatchInsights';
 import { quickCompatibilityScore } from '@/lib/matching/compatibility-engine';
-import { Profile, CompatibilityScore } from '@/lib/types';
+import { Profile } from '@/lib/types';
 
 type LocationFilter = 'nearby' | 'all' | 'virtual' | string;
-
-interface DiscoverProfile {
-  id: string;
-  user_id: string;
-  display_name: string;
-  age: number;
-  city: string;
-  bio: string;
-  virtual_only: boolean;
-  photos?: Array<{ id: string; storage_path: string; signedUrl?: string | null }>;
-  prompt_responses?: Array<{ id: string; prompt_text: string; response_text: string }>;
-  linked_partners?: Array<{ id: string; name: string; age: number }>;
-}
 
 export default function DiscoverScreen() {
   const router = useRouter();
@@ -72,14 +59,14 @@ export default function DiscoverScreen() {
   // Get unique cities from profiles
   const cities = useMemo(() => {
     if (!profiles) return [];
-    return [...new Set(profiles.map((p: DiscoverProfile) => p.city))].filter(c => c !== 'Virtual Only');
+    return [...new Set(profiles.map((p: Profile) => p.city))].filter(c => c !== 'Virtual Only');
   }, [profiles]);
 
   // Filter profiles
   const profilesToShow = useMemo(() => {
     if (!profiles) return [];
 
-    const filtered = profiles.filter((p: DiscoverProfile) => {
+    const filtered = profiles.filter((p: Profile) => {
       if (skippedProfiles.includes(p.user_id)) return false;
 
       // Apply location filter
@@ -98,7 +85,7 @@ export default function DiscoverScreen() {
     // If smart matching is enabled and we have a current profile, sort by compatibility
     if (smartMatchingEnabled && currentProfile) {
       // Calculate compatibility scores and sort
-      const withScores = filtered.map((p: DiscoverProfile) => {
+      const withScores = filtered.map((p: Profile) => {
         // Convert DiscoverProfile to partial Profile for scoring
         const profileForScoring: Partial<Profile> = {
           user_id: p.user_id,
@@ -127,10 +114,10 @@ export default function DiscoverScreen() {
       }));
     }
 
-    return filtered.map((p: DiscoverProfile) => ({ ...p, compatibilityScore: undefined }));
+    return filtered.map((p: Profile) => ({ ...p, compatibilityScore: undefined }));
   }, [profiles, skippedProfiles, locationFilter, smartMatchingEnabled, currentProfile]);
 
-  const currentProfileToShow = profilesToShow[0] as (DiscoverProfile & { compatibilityScore?: number }) | undefined;
+  const currentProfileToShow = profilesToShow[0] as (Profile & { compatibilityScore?: number }) | undefined;
 
   // Reset view timer when profile changes
   useEffect(() => {
@@ -280,7 +267,7 @@ export default function DiscoverScreen() {
   }
 
   // Get photo URL
-  const photoUrl = currentProfileToShow.photos?.[0]?.signedUrl || null;
+  const photoUrl = currentProfileToShow.photos?.[0] || null;
 
   return (
     <View className="flex-1 bg-black">
@@ -422,7 +409,7 @@ export default function DiscoverScreen() {
                   </View>
                 )}
                 {/* Linked partner badge */}
-                {currentProfileToShow.linked_partners && currentProfileToShow.linked_partners.length > 0 && (
+                {currentProfileToShow.linked_partner && (
                   <View className="absolute top-3 left-3 bg-pink-500/90 px-3 py-1.5 rounded-full flex-row items-center">
                     <Users size={14} color="white" />
                     <Text className="text-white text-xs font-medium ml-1">Has Partner</Text>
@@ -452,7 +439,7 @@ export default function DiscoverScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {/* Linked Partner Section */}
-                {currentProfileToShow.linked_partners && currentProfileToShow.linked_partners.length > 0 && (
+                {currentProfileToShow.linked_partner && (
                   <View className="mb-4 bg-pink-500/10 rounded-xl p-3 border border-pink-500/30">
                     <View className="flex-row items-center">
                       <View className="w-12 h-12 bg-pink-500/20 rounded-full items-center justify-center">
@@ -461,7 +448,7 @@ export default function DiscoverScreen() {
                       <View className="ml-3 flex-1">
                         <Text className="text-gray-400 text-xs uppercase">Linked Partner</Text>
                         <Text className="text-white font-medium">
-                          {currentProfileToShow.linked_partners[0].name}, {currentProfileToShow.linked_partners[0].age}
+                          {currentProfileToShow.linked_partner.name}, {currentProfileToShow.linked_partner.age}
                         </Text>
                       </View>
                     </View>

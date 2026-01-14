@@ -36,7 +36,7 @@ import {
   Gamepad2,
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
-import { MOCK_PROFILES } from '@/lib/mock-data';
+import { useDiscoverProfiles } from '@/lib/supabase';
 import { Profile, Message, GameType, GameParticipant } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import TimedPhotoMessage from '@/components/TimedPhotoMessage';
@@ -49,6 +49,9 @@ export default function GroupChatScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Fetch profiles from Supabase
+  const { data: profiles = [] } = useDiscoverProfiles();
 
   const threads = useDatingStore((s) => s.threads);
   const messages = useDatingStore((s) => s.messages);
@@ -108,9 +111,9 @@ export default function GroupChatScreen() {
     if (!thread?.participant_ids) return [];
     return thread.participant_ids
       .filter((id) => id !== currentUserId)
-      .map((id) => MOCK_PROFILES.find((p: Profile) => p.user_id === id))
+      .map((id) => profiles.find((p: Profile) => p.user_id === id))
       .filter((p): p is Profile => p !== undefined);
-  }, [thread, currentUserId]);
+  }, [thread, currentUserId, profiles]);
 
   // Get active game for this thread - subscribe to gameSessions for reactivity
   const activeGame = useMemo(() => {
@@ -279,7 +282,7 @@ export default function GroupChatScreen() {
   };
 
   const getSenderProfile = (senderId: string): Profile | undefined => {
-    return MOCK_PROFILES.find((p: Profile) => p.user_id === senderId);
+    return profiles.find((p: Profile) => p.user_id === senderId);
   };
 
   const renderMessage = (message: Message, index: number) => {

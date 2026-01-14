@@ -28,7 +28,7 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 import { LinkedPartner, Profile } from '@/lib/types';
-import { MOCK_PROFILES } from '@/lib/mock-data';
+import { useDiscoverProfiles } from '@/lib/supabase';
 
 interface LinkPartnerModalProps {
   visible: boolean;
@@ -65,7 +65,10 @@ export default function LinkPartnerModal({
   const [manualAge, setManualAge] = useState('');
   const [manualPhoto, setManualPhoto] = useState('');
 
-  // Search results from mock profiles
+  // Fetch profiles from Supabase
+  const { data: profiles = [] } = useDiscoverProfiles();
+
+  // Search results from Supabase profiles
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
 
@@ -74,17 +77,15 @@ export default function LinkPartnerModal({
       .filter(p => p.blend_user_id)
       .map(p => p.blend_user_id);
 
-    return MOCK_PROFILES.filter((profile: Profile) => {
+    return profiles.filter((profile: Profile) => {
       // Don't show already linked partners
       if (existingIds.includes(profile.user_id)) return false;
 
-      // Search by name or city
-      return (
-        profile.display_name.toLowerCase().includes(query) ||
-        profile.city.toLowerCase().includes(query)
-      );
+      const displayName = profile.display_name?.toLowerCase() || '';
+      const cityName = profile.city?.toLowerCase() || '';
+      return displayName.includes(query) || cityName.includes(query);
     }).slice(0, 10);
-  }, [searchQuery, existingPartners]);
+  }, [searchQuery, profiles, existingPartners]);
 
   const handleSelectProfile = useCallback((profile: Profile) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

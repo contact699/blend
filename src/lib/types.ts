@@ -50,6 +50,10 @@ export interface Profile {
   intent_ids: string[];
   prompt_responses: PromptResponse[];
   linked_partner?: LinkedPartner;
+  // Location fields for map view
+  latitude?: number;
+  longitude?: number;
+  show_on_map?: boolean;
 }
 
 export interface Intent {

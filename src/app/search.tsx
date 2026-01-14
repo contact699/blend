@@ -6,7 +6,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import useDatingStore from '@/lib/state/dating-store';
-import { MOCK_PROFILES } from '@/lib/mock-data';
+import { useDiscoverProfiles } from '@/lib/supabase';
 import {
   SearchFilters,
   AnySearchResult,
@@ -30,6 +30,9 @@ import SavedSearchesModal from '@/components/search/SavedSearchesModal';
 
 export default function SearchScreen() {
   const router = useRouter();
+
+  // Fetch profiles from Supabase
+  const { data: profiles = [], isLoading } = useDiscoverProfiles();
 
   // Store state
   const searchFilters = useDatingStore((s) => s.searchFilters);
@@ -55,14 +58,14 @@ export default function SearchScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Transform mock profiles to search results
+  // Transform Supabase profiles to search results
   const searchResults = useMemo((): AnySearchResult[] => {
     if (!searchQuery && searchFilters.quickFilters.length === 0 && !hasSearched) {
       return [];
     }
 
     // Filter profiles based on search query and filters
-    let filtered = MOCK_PROFILES.filter((profile: Profile) => {
+    let filtered = profiles.filter((profile: Profile) => {
       // Text search
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -272,7 +275,7 @@ export default function SearchScreen() {
             >
               <BrowseCategories
                 onCategoryPress={handleCategoryPress}
-                featuredProfiles={MOCK_PROFILES.slice(0, 5).map((p: Profile) => ({
+                featuredProfiles={profiles.slice(0, 5).map((p: Profile) => ({
                   id: p.user_id,
                   photo: p.photos?.[0] ?? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
                   name: p.display_name,
