@@ -2055,7 +2055,7 @@ function calculateDistance(
   lat2: number,
   lon2: number
 ): number {
-  const R = 3959; // Earth's radius in miles
+  const EARTH_RADIUS_MILES = 3959; // Earth's mean radius in miles
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   
@@ -2067,7 +2067,7 @@ function calculateDistance(
       Math.sin(dLon / 2);
   
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
+  const distance = EARTH_RADIUS_MILES * c;
   
   return distance;
 }
