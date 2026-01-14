@@ -1949,6 +1949,10 @@ export function useRefreshTasteProfile() {
 /**
  * Hook to get nearby profiles within a radius
  * Uses Haversine formula to calculate distance
+ * 
+ * Note: For better performance in production, implement spatial database queries
+ * using PostGIS extensions in PostgreSQL to filter by distance at the database level
+ * rather than fetching all profiles and filtering in JavaScript.
  */
 export function useNearbyProfiles(
   latitude: number | undefined,
@@ -2039,6 +2043,11 @@ export function useNearbyEvents(
 /**
  * Calculate distance between two coordinates using Haversine formula
  * Returns distance in miles
+ * 
+ * Note: This assumes spherical Earth geometry and has reduced accuracy
+ * at extreme latitudes (near poles). For more precise calculations over
+ * long distances or at extreme latitudes, consider using an ellipsoidal
+ * model like Vincenty's formula.
  */
 function calculateDistance(
   lat1: number,
