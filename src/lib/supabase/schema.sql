@@ -607,7 +607,7 @@ CREATE TRIGGER update_prompt_responses_updated_at
 -- GAME SESSIONS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.game_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   thread_id UUID NOT NULL REFERENCES public.chat_threads(id) ON DELETE CASCADE,
   
   -- Game configuration
@@ -691,7 +691,7 @@ CREATE POLICY "Thread participants can update game sessions"
 -- GAME MOVES TABLE (for tracking individual actions)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.game_moves (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   game_session_id UUID REFERENCES public.game_sessions(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES public.profiles(id) NOT NULL,
   
@@ -737,7 +737,7 @@ CREATE POLICY "Participants can insert own moves"
 -- CUSTOM GAME CONTENT TABLE (user-created challenges/questions)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.custom_game_content (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   created_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   
   -- Content type
