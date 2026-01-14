@@ -50,6 +50,9 @@ export interface Profile {
   intent_ids: string[];
   prompt_responses: PromptResponse[];
   linked_partner?: LinkedPartner;
+  latitude?: number; // Fuzzy location for privacy
+  longitude?: number; // Fuzzy location for privacy
+  show_on_map?: boolean; // Privacy setting: show profile on map view
 }
 
 export interface Intent {
