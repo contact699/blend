@@ -5,22 +5,20 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { X, Flag, MoreVertical } from 'lucide-react-native';
 import { GameSession, GameType } from '@/lib/types';
-import { GameSession as DbGameSession, GameType as DbGameType } from '@/lib/supabase/types';
 import { GAME_INFO } from '@/lib/game-content';
 import TruthOrDare from './TruthOrDare';
 import HotSeat from './HotSeat';
 import StoryChain from './StoryChain';
-import { useEndGame } from '@/lib/supabase/hooks';
 
 interface GameOverlayProps {
   visible: boolean;
-  game: DbGameSession | GameSession | null;
+  game: GameSession | null;
   currentUserId: string;
   onClose: () => void;
   onEndGame: (cancelled?: boolean) => void;
 }
 
-const GAME_GRADIENTS: Record<DbGameType, readonly [string, string]> = {
+const GAME_GRADIENTS: Record<GameType, readonly [string, string]> = {
   truth_or_dare: ['#ef4444', '#f97316'],
   hot_seat: ['#8b5cf6', '#a855f7'],
   story_chain: ['#3b82f6', '#6366f1'],
@@ -36,27 +34,14 @@ export default function GameOverlay({
   onClose,
   onEndGame,
 }: GameOverlayProps) {
-  const endGameMutation = useEndGame();
-
   if (!game) return null;
 
-  const gameInfo = GAME_INFO[game.game_type as GameType];
-  const gradient = GAME_GRADIENTS[game.game_type as DbGameType];
+  const gameInfo = GAME_INFO[game.game_type];
+  const gradient = GAME_GRADIENTS[game.game_type];
 
-  const handleEndGame = async (cancelled = false) => {
+  const handleEndGame = (cancelled = false) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    try {
-      await endGameMutation.mutateAsync({
-        gameSessionId: game.id,
-        status: cancelled ? 'cancelled' : 'completed',
-      });
-      onEndGame(cancelled);
-    } catch (error) {
-      console.error('Error ending game:', error);
-      // Still call onEndGame to close the overlay
-      onEndGame(cancelled);
-    }
+    onEndGame(cancelled);
   };
 
   const renderGameContent = () => {

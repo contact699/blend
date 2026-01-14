@@ -116,17 +116,17 @@ interface DatingStore {
   conversationMetrics: ConversationMetrics[];
   tasteProfile: UserTasteProfile | null;
   smartMatchingEnabled: boolean;
-  compatibilityCache: Map<string, CompatibilityScore>;
+  compatibilityCache: Record<string, CompatibilityScore>;
 
   // Events
   events: Event[];
   eventDrafts: EventDraft[];
   eventChats: EventChatThread[];
   eventNotifications: EventNotification[];
-  userRSVPs: Map<string, RSVPStatus>;
+  userRSVPs: Record<string, RSVPStatus>;
 
   // Trust Score System
-  trustScores: Map<string, TrustScore>;
+  trustScores: Record<string, TrustScore>;
   dateReviews: DateReview[];
   communityVouches: CommunityVouch[];
   trustReports: TrustReport[];
@@ -340,17 +340,17 @@ const useDatingStore = create<DatingStore>()(
       conversationMetrics: [],
       tasteProfile: null,
       smartMatchingEnabled: true,
-      compatibilityCache: new Map<string, CompatibilityScore>(),
+      compatibilityCache: {},
 
       // Events state
       events: MOCK_EVENTS,
       eventDrafts: [],
       eventChats: [],
       eventNotifications: [],
-      userRSVPs: new Map<string, RSVPStatus>(),
+      userRSVPs: {},
 
       // Trust Score state
-      trustScores: new Map<string, TrustScore>(),
+      trustScores: {},
       dateReviews: [],
       communityVouches: [],
       trustReports: [],
@@ -1478,19 +1478,18 @@ const useDatingStore = create<DatingStore>()(
       },
 
       cacheCompatibilityScore: (profileId, score) => {
-        const state = get();
-        const newCache = new Map(state.compatibilityCache);
-        newCache.set(profileId, score);
-        set({ compatibilityCache: newCache });
+        set((state) => ({
+          compatibilityCache: { ...state.compatibilityCache, [profileId]: score },
+        }));
       },
 
       getCachedCompatibilityScore: (profileId) => {
         const state = get();
-        return state.compatibilityCache.get(profileId) ?? null;
+        return state.compatibilityCache[profileId] ?? null;
       },
 
       clearCompatibilityCache: () => {
-        set({ compatibilityCache: new Map() });
+        set({ compatibilityCache: {} });
       },
 
       // ===== EVENT ACTIONS =====
@@ -1647,11 +1646,9 @@ const useDatingStore = create<DatingStore>()(
           notes: message,
         };
 
-        // Update userRSVPs map
-        const newUserRSVPs = new Map(state.userRSVPs);
-        newUserRSVPs.set(eventId, finalStatus);
-
+        // Update userRSVPs
         set((state) => ({
+          userRSVPs: { ...state.userRSVPs, [eventId]: finalStatus },
           events: state.events.map((e) => {
             if (e.id !== eventId) return e;
             const existingAttendeeIndex = e.attendees.findIndex(
@@ -1678,7 +1675,6 @@ const useDatingStore = create<DatingStore>()(
                   : e.waitlist_count,
             };
           }),
-          userRSVPs: newUserRSVPs,
         }));
 
         // Notify host
@@ -1711,10 +1707,10 @@ const useDatingStore = create<DatingStore>()(
 
         const wasGoing = attendee.rsvp_status === 'going';
 
-        const newUserRSVPs = new Map(state.userRSVPs);
-        newUserRSVPs.delete(eventId);
+        const { [eventId]: _, ...remainingRSVPs } = state.userRSVPs;
 
         set((state) => ({
+          userRSVPs: remainingRSVPs,
           events: state.events.map((e) => {
             if (e.id !== eventId) return e;
             return {
@@ -1727,7 +1723,6 @@ const useDatingStore = create<DatingStore>()(
                 : e.current_attendees,
             };
           }),
-          userRSVPs: newUserRSVPs,
         }));
 
         // Promote from waitlist if there was a spot
@@ -2049,7 +2044,7 @@ const useDatingStore = create<DatingStore>()(
 
       getUserRSVPStatus: (eventId) => {
         const state = get();
-        return state.userRSVPs.get(eventId) ?? null;
+        return state.userRSVPs[eventId] ?? null;
       },
 
       canHostPublicEvents: () => {
@@ -2063,12 +2058,12 @@ const useDatingStore = create<DatingStore>()(
 
       getTrustScore: (userId) => {
         const state = get();
-        return state.trustScores.get(userId) ?? null;
+        return state.trustScores[userId] ?? null;
       },
 
       initializeTrustScore: (userId) => {
         const state = get();
-        const existing = state.trustScores.get(userId);
+        const existing = state.trustScores[userId];
         if (existing) return existing;
 
         const now = new Date().toISOString();
@@ -2115,16 +2110,16 @@ const useDatingStore = create<DatingStore>()(
           updated_at: now,
         };
 
-        const newTrustScores = new Map(state.trustScores);
-        newTrustScores.set(userId, newTrustScore);
-        set({ trustScores: newTrustScores });
+        set((state) => ({
+          trustScores: { ...state.trustScores, [userId]: newTrustScore },
+        }));
 
         return newTrustScore;
       },
 
       updateTrustScore: (userId, dimension, change, reason) => {
         const state = get();
-        let trustScore = state.trustScores.get(userId);
+        let trustScore = state.trustScores[userId];
         if (!trustScore) {
           trustScore = get().initializeTrustScore(userId);
         }
@@ -2167,9 +2162,9 @@ const useDatingStore = create<DatingStore>()(
           updated_at: now,
         };
 
-        const newTrustScores = new Map(state.trustScores);
-        newTrustScores.set(userId, updatedTrustScore);
-        set({ trustScores: newTrustScores });
+        set((state) => ({
+          trustScores: { ...state.trustScores, [userId]: updatedTrustScore },
+        }));
 
         // Check for tier upgrade notification
         if (newTier !== trustScore.tier) {
@@ -2215,7 +2210,7 @@ const useDatingStore = create<DatingStore>()(
         );
 
         // Update stats
-        const trustScore = state.trustScores.get(reviewData.reviewed_user_id);
+        const trustScore = state.trustScores[reviewData.reviewed_user_id];
         if (trustScore) {
           const reviews = state.dateReviews.filter(
             (r) => r.reviewed_user_id === reviewData.reviewed_user_id
@@ -2233,9 +2228,9 @@ const useDatingStore = create<DatingStore>()(
             },
           };
 
-          const newTrustScores = new Map(state.trustScores);
-          newTrustScores.set(reviewData.reviewed_user_id, updatedScore);
-          set({ trustScores: newTrustScores });
+          set((state) => ({
+            trustScores: { ...state.trustScores, [reviewData.reviewed_user_id]: updatedScore },
+          }));
         }
 
         // Send notification to reviewed user
@@ -2269,7 +2264,7 @@ const useDatingStore = create<DatingStore>()(
         const now = new Date().toISOString();
 
         // Get voucher's trust tier
-        const voucherTrustScore = state.trustScores.get(vouchData.voucher_id);
+        const voucherTrustScore = state.trustScores[vouchData.voucher_id];
         const voucherTier: TrustTier = voucherTrustScore?.tier ?? 'newcomer';
 
         const newVouch: CommunityVouch = {
@@ -2299,7 +2294,7 @@ const useDatingStore = create<DatingStore>()(
         );
 
         // Update stats
-        const trustScore = state.trustScores.get(vouchData.vouched_user_id);
+        const trustScore = state.trustScores[vouchData.vouched_user_id];
         if (trustScore) {
           const updatedScore: TrustScore = {
             ...trustScore,
@@ -2308,9 +2303,9 @@ const useDatingStore = create<DatingStore>()(
               vouches_received: trustScore.stats.vouches_received + 1,
             },
           };
-          const newTrustScores = new Map(state.trustScores);
-          newTrustScores.set(vouchData.vouched_user_id, updatedScore);
-          set({ trustScores: newTrustScores });
+          set((state) => ({
+            trustScores: { ...state.trustScores, [vouchData.vouched_user_id]: updatedScore },
+          }));
         }
 
         // Send notification
@@ -2361,7 +2356,7 @@ const useDatingStore = create<DatingStore>()(
         );
 
         // Update stats
-        const trustScore = state.trustScores.get(reportData.reported_user_id);
+        const trustScore = state.trustScores[reportData.reported_user_id];
         if (trustScore) {
           const updatedScore: TrustScore = {
             ...trustScore,
@@ -2370,9 +2365,9 @@ const useDatingStore = create<DatingStore>()(
               reports_received: trustScore.stats.reports_received + 1,
             },
           };
-          const newTrustScores = new Map(state.trustScores);
-          newTrustScores.set(reportData.reported_user_id, updatedScore);
-          set({ trustScores: newTrustScores });
+          set((state) => ({
+            trustScores: { ...state.trustScores, [reportData.reported_user_id]: updatedScore },
+          }));
         }
       },
 
@@ -2419,7 +2414,7 @@ const useDatingStore = create<DatingStore>()(
         const targetSettings = state.trustSettings; // In real app, would fetch target user's settings
         if (!targetSettings) return true;
 
-        const myTrustScore = state.trustScores.get(state.currentUserId);
+        const myTrustScore = state.trustScores[state.currentUserId];
         const myTier = myTrustScore?.tier ?? 'newcomer';
 
         const tierOrder: TrustTier[] = ['newcomer', 'member', 'trusted', 'verified', 'ambassador'];
@@ -2439,7 +2434,7 @@ const useDatingStore = create<DatingStore>()(
 
       checkAndAwardBadges: (userId) => {
         const state = get();
-        const trustScore = state.trustScores.get(userId);
+        const trustScore = state.trustScores[userId];
         if (!trustScore) return [];
 
         const newBadges: TrustBadge[] = [];
@@ -2496,9 +2491,9 @@ const useDatingStore = create<DatingStore>()(
             ...trustScore,
             badges: [...trustScore.badges, ...newBadges],
           };
-          const newTrustScores = new Map(state.trustScores);
-          newTrustScores.set(userId, updatedScore);
-          set({ trustScores: newTrustScores });
+          set((state) => ({
+            trustScores: { ...state.trustScores, [userId]: updatedScore },
+          }));
 
           // Send notification for each badge
           const now = new Date().toISOString();
