@@ -1945,3 +1945,226 @@ export function useRefreshTasteProfile() {
     },
   });
 }
+
+// ============================================================================
+// QUIZ RESULTS HOOKS
+// ============================================================================
+
+interface QuizResultData {
+  id: string;
+  user_id: string;
+  answers: Array<{ questionId: string; answerId: string; value: number }>;
+  jealousy_score: number;
+  communication_score: number;
+  hierarchy_score: number;
+  disclosure_score: number;
+  time_management_score: number;
+  boundaries_score: number;
+  profile_type: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
+  show_on_profile: boolean;
+  share_with_matches: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Hook to get current user's quiz results
+ */
+export function useMyQuizResults() {
+  const { data: user } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['quiz-results', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+
+      const { data, error } = await supabase
+        .from('quiz_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[QuizResults] Error fetching:', error);
+        return null;
+      }
+
+      return data as QuizResultData | null;
+    },
+    enabled: !!user?.id,
+  });
+}
+
+/**
+ * Hook to get another user's quiz results (if shared)
+ */
+export function useUserQuizResults(userId?: string) {
+  const { data: currentUser } = useCurrentUser();
+
+  return useQuery({
+    queryKey: ['quiz-results', userId],
+    queryFn: async () => {
+      if (!userId || !currentUser) return null;
+
+      const { data, error } = await supabase
+        .from('quiz_results')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[QuizResults] Error fetching user quiz:', error);
+        return null;
+      }
+
+      // RLS will filter this if not shared
+      return data as QuizResultData | null;
+    },
+    enabled: !!userId && !!currentUser,
+  });
+}
+
+/**
+ * Hook to submit or update quiz results
+ */
+export function useSubmitQuizResults() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async (input: {
+      answers: Array<{ questionId: string; answerId: string; value: number }>;
+      jealousy_score: number;
+      communication_score: number;
+      hierarchy_score: number;
+      disclosure_score: number;
+      time_management_score: number;
+      boundaries_score: number;
+      profile_type: 'open_communicator' | 'independent_explorer' | 'security_seeker' | 'flexible_navigator' | 'community_builder';
+      show_on_profile?: boolean;
+      share_with_matches?: boolean;
+    }) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      // Upsert quiz results (insert or update)
+      const { data, error } = await supabase
+        .from('quiz_results')
+        .upsert({
+          user_id: user.id,
+          answers: input.answers,
+          jealousy_score: input.jealousy_score,
+          communication_score: input.communication_score,
+          hierarchy_score: input.hierarchy_score,
+          disclosure_score: input.disclosure_score,
+          time_management_score: input.time_management_score,
+          boundaries_score: input.boundaries_score,
+          profile_type: input.profile_type,
+          show_on_profile: input.show_on_profile ?? true,
+          share_with_matches: input.share_with_matches ?? true,
+        }, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as QuizResultData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quiz-results'] });
+    },
+  });
+}
+
+/**
+ * Hook to update quiz visibility settings
+ */
+export function useUpdateQuizVisibility() {
+  const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
+
+  return useMutation({
+    mutationFn: async (input: {
+      show_on_profile?: boolean;
+      share_with_matches?: boolean;
+    }) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('quiz_results')
+        .update({
+          show_on_profile: input.show_on_profile,
+          share_with_matches: input.share_with_matches,
+        })
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as QuizResultData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quiz-results'] });
+    },
+  });
+}
+
+/**
+ * Hook to calculate compatibility between two users' quiz results
+ */
+export function useQuizCompatibility(userId1?: string, userId2?: string) {
+  return useQuery({
+    queryKey: ['quiz-compatibility', userId1, userId2],
+    queryFn: async () => {
+      if (!userId1 || !userId2) return null;
+
+      // Fetch both quiz results
+      const [result1Response, result2Response] = await Promise.all([
+        supabase.from('quiz_results').select('*').eq('user_id', userId1).maybeSingle(),
+        supabase.from('quiz_results').select('*').eq('user_id', userId2).maybeSingle(),
+      ]);
+
+      if (result1Response.error || result2Response.error) {
+        console.error('[QuizCompatibility] Error fetching:', result1Response.error || result2Response.error);
+        return null;
+      }
+
+      const result1 = result1Response.data as QuizResultData | null;
+      const result2 = result2Response.data as QuizResultData | null;
+
+      if (!result1 || !result2) return null;
+
+      // Calculate compatibility score (0-100)
+      const dimensions = [
+        { key: 'communication_score', weight: 0.2 },
+        { key: 'jealousy_score', weight: 0.2 },
+        { key: 'time_management_score', weight: 0.15 },
+        { key: 'hierarchy_score', weight: 0.15 },
+        { key: 'disclosure_score', weight: 0.15 },
+        { key: 'boundaries_score', weight: 0.15 },
+      ] as const;
+
+      let totalSimilarity = 0;
+      const dimensionScores: Record<string, number> = {};
+
+      dimensions.forEach(({ key, weight }) => {
+        const val1 = result1[key];
+        const val2 = result2[key];
+        const diff = Math.abs(val1 - val2);
+        const similarity = 1 - diff / 100; // Max diff is 100
+        dimensionScores[key] = similarity * 100;
+        totalSimilarity += similarity * weight;
+      });
+
+      const overallScore = totalSimilarity * 100;
+
+      return {
+        score: Math.round(overallScore),
+        dimensionScores,
+        profile1: result1.profile_type,
+        profile2: result2.profile_type,
+        profileMatch: result1.profile_type === result2.profile_type,
+      };
+    },
+    enabled: !!userId1 && !!userId2,
+  });
+}
+
