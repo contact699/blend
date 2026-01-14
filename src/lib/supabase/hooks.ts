@@ -1945,3 +1945,481 @@ export function useRefreshTasteProfile() {
     },
   });
 }
+
+// ============================================================================
+// GAME HOOKS
+// ============================================================================
+
+/**
+ * Hook to get active game session for a thread
+ */
+export function useActiveGameSession(threadId: string | undefined) {
+  return useQuery({
+    queryKey: ['game-session', 'active', threadId],
+    queryFn: async () => {
+      if (!threadId) return null;
+
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('thread_id', threadId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!threadId,
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+  });
+}
+
+/**
+ * Hook to get a specific game session
+ */
+export function useGameSession(gameSessionId: string | undefined) {
+  return useQuery({
+    queryKey: ['game-session', gameSessionId],
+    queryFn: async () => {
+      if (!gameSessionId) return null;
+
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('id', gameSessionId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!gameSessionId,
+    refetchInterval: 5000, // Poll every 5 seconds
+  });
+}
+
+/**
+ * Hook to start a new game
+ */
+export function useStartGame() {
+  const queryClient = useQueryClient();
+  const { data: profile } = useCurrentProfile();
+
+  return useMutation({
+    mutationFn: async (input: {
+      threadId: string;
+      gameType: string;
+      config: Record<string, unknown>;
+      turnOrder: string[];
+    }) => {
+      if (!profile?.id) throw new Error('No profile');
+
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .insert({
+          thread_id: input.threadId,
+          game_type: input.gameType as any,
+          status: 'active',
+          config: input.config,
+          game_state: {},
+          turn_order: input.turnOrder,
+          current_turn_user_id: input.turnOrder[0] ?? null,
+          started_by: profile.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-session', 'active', data.thread_id] });
+    },
+  });
+}
+
+/**
+ * Hook to end a game
+ */
+export function useEndGame() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      gameSessionId: string;
+      status: 'completed' | 'cancelled';
+    }) => {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({
+          status: input.status,
+          ended_at: new Date().toISOString(),
+        })
+        .eq('id', input.gameSessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-session', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['game-session', 'active', data.thread_id] });
+    },
+  });
+}
+
+/**
+ * Hook to pause a game
+ */
+export function usePauseGame() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (gameSessionId: string) => {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({ status: 'paused' })
+        .eq('id', gameSessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-session', data.id] });
+    },
+  });
+}
+
+/**
+ * Hook to resume a game
+ */
+export function useResumeGame() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (gameSessionId: string) => {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({ status: 'active' })
+        .eq('id', gameSessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-session', data.id] });
+    },
+  });
+}
+
+/**
+ * Hook to get game moves for a session
+ */
+export function useGameMoves(gameSessionId: string | undefined) {
+  return useQuery({
+    queryKey: ['game-moves', gameSessionId],
+    queryFn: async () => {
+      if (!gameSessionId) return [];
+
+      const { data, error } = await supabase
+        .from('game_moves')
+        .select('*')
+        .eq('game_session_id', gameSessionId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!gameSessionId,
+    refetchInterval: 5000, // Poll every 5 seconds
+  });
+}
+
+/**
+ * Hook to submit a game move
+ */
+export function useSubmitMove() {
+  const queryClient = useQueryClient();
+  const { data: profile } = useCurrentProfile();
+
+  return useMutation({
+    mutationFn: async (input: {
+      gameSessionId: string;
+      moveType: string;
+      moveData: Record<string, unknown>;
+      roundNumber: number;
+    }) => {
+      if (!profile?.id) throw new Error('No profile');
+
+      const { data, error } = await supabase
+        .from('game_moves')
+        .insert({
+          game_session_id: input.gameSessionId,
+          user_id: profile.id,
+          move_type: input.moveType,
+          move_data: input.moveData,
+          round_number: input.roundNumber,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-moves', data.game_session_id] });
+    },
+  });
+}
+
+/**
+ * Hook to advance turn to next player
+ */
+export function useAdvanceTurn() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      gameSessionId: string;
+      currentGameState: Record<string, unknown>;
+    }) => {
+      // Get current session to find next player
+      const { data: session, error: sessionError } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('id', input.gameSessionId)
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      const currentIndex = session.turn_order.findIndex(
+        (id) => id === session.current_turn_user_id
+      );
+      const nextIndex = (currentIndex + 1) % session.turn_order.length;
+      const nextUserId = session.turn_order[nextIndex];
+
+      // Check if we should increment round
+      const shouldIncrementRound = nextIndex === 0;
+      const newRound = shouldIncrementRound ? session.current_round + 1 : session.current_round;
+
+      // Update session
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({
+          current_turn_user_id: nextUserId,
+          current_round: newRound,
+          game_state: input.currentGameState,
+        })
+        .eq('id', input.gameSessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-session', data.id] });
+    },
+  });
+}
+
+/**
+ * Hook to update game state
+ */
+export function useUpdateGameState() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      gameSessionId: string;
+      gameState: Record<string, unknown>;
+    }) => {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({ game_state: input.gameState })
+        .eq('id', input.gameSessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['game-session', data.id] });
+    },
+  });
+}
+
+/**
+ * Hook to get user's custom game content
+ */
+export function useMyCustomContent(gameType?: string) {
+  const { data: profile } = useCurrentProfile();
+
+  return useQuery({
+    queryKey: ['custom-content', 'my', profile?.id, gameType],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+
+      let query = supabase
+        .from('custom_game_content')
+        .select('*')
+        .eq('created_by', profile.id);
+
+      if (gameType) {
+        query = query.eq('game_type', gameType);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!profile?.id,
+  });
+}
+
+/**
+ * Hook to get approved custom content for a game type
+ */
+export function useCustomContent(gameType: string) {
+  return useQuery({
+    queryKey: ['custom-content', 'approved', gameType],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('custom_game_content')
+        .select('*')
+        .eq('game_type', gameType)
+        .eq('is_approved', true)
+        .order('times_used', { ascending: false });
+
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/**
+ * Hook to create custom game content
+ */
+export function useCreateCustomContent() {
+  const queryClient = useQueryClient();
+  const { data: profile } = useCurrentProfile();
+
+  return useMutation({
+    mutationFn: async (input: {
+      gameType: 'truth_or_dare' | 'hot_seat' | 'story_chain';
+      contentType: string;
+      content: string;
+      category?: string;
+      difficulty?: string;
+      forCouples?: boolean;
+      forSingles?: boolean;
+      theme?: string;
+    }) => {
+      if (!profile?.id) throw new Error('No profile');
+
+      const { data, error } = await supabase
+        .from('custom_game_content')
+        .insert({
+          created_by: profile.id,
+          game_type: input.gameType,
+          content_type: input.contentType,
+          content: input.content,
+          category: input.category ?? null,
+          difficulty: input.difficulty ?? null,
+          for_couples: input.forCouples ?? false,
+          for_singles: input.forSingles ?? true,
+          theme: input.theme ?? null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom-content', 'my'] });
+      queryClient.invalidateQueries({ queryKey: ['custom-content', 'approved'] });
+    },
+  });
+}
+
+/**
+ * Hook to delete custom content
+ */
+export function useDeleteCustomContent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (contentId: string) => {
+      const { error } = await supabase
+        .from('custom_game_content')
+        .delete()
+        .eq('id', contentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom-content', 'my'] });
+    },
+  });
+}
+
+/**
+ * Hook to subscribe to game session changes using Supabase Realtime
+ */
+export function useGameSessionSubscription(
+  gameSessionId: string | undefined,
+  onUpdate: (session: any) => void
+) {
+  const queryClient = useQueryClient();
+
+  useQuery({
+    queryKey: ['game-session-subscription', gameSessionId],
+    queryFn: () => {
+      if (!gameSessionId) return null;
+
+      const channel = supabase
+        .channel(`game:${gameSessionId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'game_sessions',
+            filter: `id=eq.${gameSessionId}`,
+          },
+          (payload) => {
+            onUpdate(payload.new);
+            queryClient.invalidateQueries({ queryKey: ['game-session', gameSessionId] });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'game_moves',
+            filter: `game_session_id=eq.${gameSessionId}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['game-moves', gameSessionId] });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        channel.unsubscribe();
+      };
+    },
+    enabled: !!gameSessionId,
+    staleTime: Infinity,
+  });
+}
