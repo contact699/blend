@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useRealtimeAll } from '@/lib/supabase';
+import { usePushNotifications } from '@/lib/notifications';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -28,6 +29,9 @@ const DatingDarkTheme = {
 function AppContent() {
   // Subscribe to real-time updates for matches, likes, pings, events
   useRealtimeAll();
+  
+  // Initialize push notifications
+  usePushNotifications();
 
   useEffect(() => {
     SplashScreen.hideAsync();
