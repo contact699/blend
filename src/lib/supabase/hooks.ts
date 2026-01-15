@@ -1124,8 +1124,10 @@ export function useEvent(eventId: string | undefined) {
       // Get signed URLs
       const allPaths = [
         event.cover_image_path,
-        ...(event.host_profile?.photos?.map(p => p.storage_path) ?? []),
-        ...event.event_rsvps.flatMap(a => a.attendee_profile?.photos?.map(p => p.storage_path) ?? []),
+        ...(event.host_profile?.photos?.map((p: { storage_path: string }) => p.storage_path) ?? []),
+        ...event.event_rsvps.flatMap((a: { attendee_profile?: { photos?: Array<{ storage_path: string }> } }) => 
+          a.attendee_profile?.photos?.map((p: { storage_path: string }) => p.storage_path) ?? []
+        ),
       ].filter((p): p is string => !!p);
 
       const signedUrls = allPaths.length > 0 ? await getSignedPhotoUrls(allPaths) : new Map();

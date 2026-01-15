@@ -14,7 +14,7 @@ import {
   Wifi,
 } from 'lucide-react-native';
 import { Profile, ENMBadge, RelationshipStructure, STITestRecord, TrustTier, TrustBadge as TrustBadgeType } from '@/lib/types';
-import { ENM_BADGES, RELATIONSHIP_STRUCTURES } from '@/lib/mock-data';
+import { ENM_BADGES, RELATIONSHIP_STRUCTURES } from '@/lib/static-data';
 import { TrustBadgeIcon } from './TrustBadge';
 import { TrustScorePreview } from './TrustScoreCard';
 

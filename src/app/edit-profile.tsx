@@ -24,7 +24,7 @@ import {
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
 import { useUploadPhoto } from '@/lib/supabase';
-import { INTENTS } from '@/lib/mock-data';
+import { INTENTS } from '@/lib/static-data';
 import { Intent, LinkedPartner } from '@/lib/types';
 import { cn } from '@/lib/cn';
 

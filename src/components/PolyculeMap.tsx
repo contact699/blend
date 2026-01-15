@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, Users, Edit3, Link, UserX, Check, Clock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Polycule, PolyculeConnection } from '@/lib/types';
-import { RELATIONSHIP_STRUCTURES } from '@/lib/mock-data';
+import { RELATIONSHIP_STRUCTURES } from '@/lib/static-data';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAP_SIZE = SCREEN_WIDTH - 48;

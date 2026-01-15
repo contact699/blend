@@ -23,13 +23,7 @@ import DateCalendar from '@/components/DateCalendar';
 import AgreementBuilder from '@/components/AgreementBuilder';
 import MeetThePartners from '@/components/MeetThePartners';
 import { supabase, useCurrentProfile, useCurrentUser } from '@/lib/supabase';
-import {
-  MOCK_POLYCULE,
-  MOCK_SCHEDULED_DATES,
-  MOCK_PARTNER_PROFILES,
-  MOCK_STI_RECORD,
-} from '@/lib/mock-data';
-import { ScheduledDate, RelationshipAgreement, Polycule, PolyculeConnection } from '@/lib/types';
+import { ScheduledDate, RelationshipAgreement, Polycule, PolyculeConnection, PartnerProfile } from '@/lib/types';
 
 type FeatureSection = 'map' | 'calendar' | 'agreement' | 'partners' | null;
 
@@ -83,7 +77,7 @@ export default function MyRelationships() {
   const { data: profile } = useCurrentProfile();
   const [expandedSection, setExpandedSection] = useState<FeatureSection>(null);
   const [showAgreementBuilder, setShowAgreementBuilder] = useState(false);
-  const [dates, setDates] = useState<ScheduledDate[]>(MOCK_SCHEDULED_DATES);
+  const [dates, setDates] = useState<ScheduledDate[]>([]); // Will be fetched from Supabase
   const [agreement, setAgreement] = useState<RelationshipAgreement | null>(null);
 
   // Fetch linked partners from database
@@ -164,10 +158,22 @@ export default function MyRelationships() {
     setShowAgreementBuilder(false);
   };
 
-  // Calculate days since STI test
-  const daysSinceTest = Math.floor(
-    (Date.now() - new Date(MOCK_STI_RECORD.test_date).getTime()) / (1000 * 60 * 60 * 24)
-  );
+  // Build partner profiles from linked partners for MeetThePartners component
+  const partnerProfiles: PartnerProfile[] = (linkedPartners ?? []).map((partner) => ({
+    id: partner.id,
+    name: partner.name,
+    age: 0, // Will be populated when linked partner syncs with Blend profile
+    photo: partner.photo_storage_path ?? undefined,
+    relationship_type: 'Partner',
+    relationship_duration: 'Recently linked',
+    bio: '',
+    involvement_level: 'aware_only' as const,
+    can_message: false,
+  }));
+
+  // TODO: Fetch STI record from Supabase with useQuery
+  // For now, show placeholder if no data
+  const daysSinceTest = null; // Will be: stiRecord ? Math.floor((Date.now() - new Date(stiRecord.test_date).getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   return (
     <View className="flex-1 bg-black">
@@ -344,7 +350,7 @@ export default function MyRelationships() {
                 <ChevronLeft size={20} color="#c084fc" />
                 <Text className="text-purple-400 ml-1">Back to overview</Text>
               </Pressable>
-              <MeetThePartners partners={MOCK_PARTNER_PROFILES} isEditable />
+              <MeetThePartners partners={partnerProfiles} isEditable />
             </View>
           ) : (
             <FeatureCard
@@ -353,7 +359,7 @@ export default function MyRelationships() {
               description="Introduce your relationship network"
               color="#ec4899"
               onPress={() => setExpandedSection('partners')}
-              badge={`${MOCK_PARTNER_PROFILES.length} partners`}
+              badge={partnerProfiles.length > 0 ? `${partnerProfiles.length} partners` : undefined}
             />
           )}
 
@@ -371,7 +377,7 @@ export default function MyRelationships() {
               <View className="flex-1">
                 <Text className="text-white font-medium">STI Safety</Text>
                 <Text className="text-zinc-500 text-sm">
-                  Last tested {daysSinceTest} days ago
+                  {daysSinceTest !== null ? `Last tested ${daysSinceTest} days ago` : 'Track your testing'}
                 </Text>
               </View>
               <ChevronRight size={18} color="#6b7280" />

@@ -19,7 +19,7 @@ import {
   Video,
 } from 'lucide-react-native';
 import { Event } from '@/lib/types';
-import { EVENT_CATEGORIES } from '@/lib/mock-events';
+import { EVENT_CATEGORIES } from '@/lib/static-data';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 

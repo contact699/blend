@@ -36,7 +36,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
-import { EVENT_CATEGORIES, MOCK_HOSTS } from '@/lib/mock-events';
+import { EVENT_CATEGORIES } from '@/lib/static-data';
 import { EventCategory, EventVisibility, EventLocation } from '@/lib/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -103,12 +103,13 @@ export default function CreateEventScreen() {
   const handleCreate = () => {
     if (!category || !currentProfile) return;
 
-    const host = MOCK_HOSTS.find((h) => h.user_id === currentUserId) ?? {
+    // Build host info from current profile
+    const host = {
       user_id: currentUserId,
       display_name: currentProfile.display_name,
       photo: currentProfile.photos[0],
-      reputation_stars: 3,
-      events_hosted: 0,
+      reputation_stars: 3, // Will be calculated from trust score
+      events_hosted: 0, // Will be fetched from Supabase
     };
 
     const location: EventLocation = {

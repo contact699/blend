@@ -16,7 +16,7 @@ import {
   Sparkles,
   Save,
 } from 'lucide-react-native';
-import { CONSENT_ITEMS_TEMPLATE } from '@/lib/mock-data';
+import { CONSENT_ITEMS_TEMPLATE } from '@/lib/static-data';
 import { ConsentItem, ConsentChecklist as ConsentChecklistType } from '@/lib/types';
 
 const CATEGORY_CONFIG: {

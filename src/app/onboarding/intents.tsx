@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Check, ChevronRight } from 'lucide-react-native';
-import { INTENTS } from '@/lib/mock-data';
+import { INTENTS } from '@/lib/static-data';
 import useDatingStore from '@/lib/state/dating-store';
 import { cn } from '@/lib/cn';
 

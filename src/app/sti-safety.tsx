@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Pressable, TextInput, Modal } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Pressable, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,7 +15,6 @@ import {
   Clock,
   X,
 } from 'lucide-react-native';
-import { MOCK_STI_RECORD } from '@/lib/mock-data';
 import { STITestRecord } from '@/lib/types';
 
 const COMMON_TESTS = [
@@ -240,8 +239,48 @@ function AddTestModal({
 
 export default function STISafety() {
   const router = useRouter();
-  const [record, setRecord] = useState<STITestRecord>(MOCK_STI_RECORD);
+  // TODO: Replace with useSTIRecord() hook from Supabase
+  const [record, setRecord] = useState<STITestRecord | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // If no record exists, show empty state encouraging user to add their first test
+  if (!record) {
+    return (
+      <SafeAreaView className="flex-1 bg-black">
+        <View className="px-6 py-4 flex-row items-center border-b border-zinc-800">
+          <Pressable onPress={() => router.back()} className="mr-4">
+            <ChevronLeft size={24} color="white" />
+          </Pressable>
+          <Text className="text-white font-bold text-lg">STI Safety</Text>
+        </View>
+        <View className="flex-1 items-center justify-center px-6">
+          <Shield size={64} color="#c084fc" />
+          <Text className="text-white text-xl font-bold mt-4">No Test Records Yet</Text>
+          <Text className="text-zinc-400 text-center mt-2">
+            Track your STI testing history to share your status with matches
+          </Text>
+          <Pressable
+            onPress={() => setShowAddModal(true)}
+            className="mt-6 bg-purple-500 px-6 py-3 rounded-xl"
+          >
+            <Text className="text-white font-semibold">Add First Test</Text>
+          </Pressable>
+        </View>
+        <AddTestModal
+          visible={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSave={(newRecord) => {
+            setRecord({
+              id: `sti-${Date.now()}`,
+              user_id: 'current-user',
+              ...newRecord,
+            });
+            setShowAddModal(false);
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const daysSinceTest = daysSince(record.test_date);
   const daysUntilNext = record.next_test_date ? daysUntil(record.next_test_date) : null;

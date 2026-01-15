@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Check, ChevronRight, LogOut } from 'lucide-react-native';
-import { PROFILE_PROMPTS } from '@/lib/mock-data';
+import { PROFILE_PROMPTS } from '@/lib/static-data';
 import useDatingStore from '@/lib/state/dating-store';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/cn';

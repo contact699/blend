@@ -29,7 +29,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser, useThreadMessages, useSendMessage, supabase } from '@/lib/supabase';
 import { getSignedPhotoUrls } from '@/lib/supabase/photos';
 import { cn } from '@/lib/cn';
-import { FIRST_MESSAGE_PROMPTS } from '@/lib/mock-data';
+import { FIRST_MESSAGE_PROMPTS } from '@/lib/static-data';
 import { FirstMessagePrompt } from '@/lib/types';
 import IncomingCallModal from '@/components/IncomingCallModal';
 import { useIncomingCall } from '@/lib/hooks/useIncomingCall';

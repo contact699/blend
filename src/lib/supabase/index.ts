@@ -31,7 +31,6 @@ export {
   useEvents,
   useEvent,
   useCreateEvent,
-  useUpdateEventAttendance,
   // Trust Score
   useTrustScore,
   useDateReviews,
@@ -54,5 +53,57 @@ export {
   validateImage,
   securePhotoUpload,
 } from './photos';
+
+// Type adapters for transforming Supabase data to App types
+export {
+  // Utility functions
+  nullToUndefined,
+  undefinedToNull,
+  parseDate,
+  // Profile adapters
+  transformProfile,
+  transformProfiles,
+  extractPhotoUrl,
+  getFirstPhotoUrl,
+  hasPhotos,
+  // Event adapters
+  transformEvent,
+  transformEvents,
+  // Message adapters
+  transformMessage,
+  transformMessages,
+  // Match adapters
+  transformMatch,
+  transformMatches,
+  // Thread adapters
+  transformChatThread,
+  transformChatThreads,
+  // Like & Pind adapters
+  transformLike,
+  transformLikes,
+  transformPind,
+  transformPinds,
+  // Partner adapters
+  transformLinkedPartner,
+  // Type guards
+  isSupabaseProfile,
+  isAppProfile,
+  ensureAppProfile,
+} from './adapters';
+
+// Supabase types for use in hooks
+export type {
+  SupabasePhoto,
+  SupabaseProfile,
+  SupabaseProfileIntent,
+  SupabasePromptResponse,
+  SupabaseEvent,
+  SupabaseMessage,
+  SupabaseMatch,
+  SupabaseChatThread,
+  SupabaseLike,
+  SupabasePind,
+  SupabaseLinkedPartner,
+} from './adapters';
 
 export type { Database } from './types';

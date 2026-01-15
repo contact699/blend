@@ -25,7 +25,7 @@ import {
   RotateCcw,
   Share2,
 } from 'lucide-react-native';
-import { QUIZ_QUESTIONS } from '@/lib/mock-data';
+import { QUIZ_QUESTIONS } from '@/lib/static-data';
 import { QuizQuestion, QuizResult } from '@/lib/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

@@ -32,7 +32,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import { useEvents } from '@/lib/supabase/hooks';
-import { EVENT_CATEGORIES } from '@/lib/mock-events';
+import { EVENT_CATEGORIES } from '@/lib/static-data';
 import { EventCategory } from '@/lib/types';
 import EventCard from '@/components/EventCard';
 

@@ -46,7 +46,7 @@ import {
   Shield,
 } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
-import { EVENT_CATEGORIES } from '@/lib/mock-events';
+import { EVENT_CATEGORIES } from '@/lib/static-data';
 import { RSVPStatus } from '@/lib/types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');

@@ -44,7 +44,7 @@ import {
   RelationshipStructure,
   TrustTier,
 } from '@/lib/types';
-import { RELATIONSHIP_STRUCTURES } from '@/lib/mock-data';
+import { RELATIONSHIP_STRUCTURES } from '@/lib/static-data';
 
 interface AdvancedFiltersModalProps {
   visible: boolean;

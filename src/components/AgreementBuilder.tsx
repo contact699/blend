@@ -26,7 +26,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { RelationshipAgreement, AgreementSection } from '@/lib/types';
-import { AGREEMENT_TEMPLATES } from '@/lib/mock-data';
+import { AGREEMENT_TEMPLATES } from '@/lib/static-data';
 
 interface AgreementBuilderProps {
   agreement?: RelationshipAgreement | null;

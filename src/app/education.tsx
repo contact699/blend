@@ -15,7 +15,7 @@ import {
   Clock,
   Bookmark,
 } from 'lucide-react-native';
-import { EDUCATION_ARTICLES } from '@/lib/mock-data';
+import { EDUCATION_ARTICLES } from '@/lib/static-data';
 import { EducationArticle } from '@/lib/types';
 
 const CATEGORY_CONFIG: {

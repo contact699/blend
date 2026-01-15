@@ -3,9 +3,63 @@
  * 
  * Supabase returns data in a different format than our app expects.
  * These adapters handle the transformation cleanly.
+ * 
+ * KEY DIFFERENCES:
+ * - Supabase: photos are objects with { storage_path, signedUrl, ... }
+ * - App: photos are string[] of URLs
+ * - Supabase: nullable fields use `null`
+ * - App: optional fields use `undefined`
+ * - Supabase: snake_case column names
+ * - App: snake_case (matching Supabase for consistency)
  */
 
-import { Profile, PromptResponse } from '../types';
+import { 
+  Profile, 
+  PromptResponse, 
+  Match, 
+  ChatThread, 
+  Message, 
+  Like, 
+  Pind,
+  MessageReaction,
+  LinkedPartner,
+} from '../types';
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Convert null to undefined for optional fields
+ * This handles the Supabase null vs TypeScript undefined difference
+ */
+export function nullToUndefined<T>(value: T | null | undefined): T | undefined {
+  return value === null ? undefined : value;
+}
+
+/**
+ * Convert undefined to null for database inserts
+ */
+export function undefinedToNull<T>(value: T | null | undefined): T | null {
+  return value === undefined ? null : value;
+}
+
+/**
+ * Safely parse a date string, returning undefined if invalid
+ */
+export function parseDate(dateStr: string | null | undefined): string | undefined {
+  if (!dateStr) return undefined;
+  try {
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? undefined : dateStr;
+  } catch {
+    return undefined;
+  }
+}
+
+// ============================================================================
+// PHOTO TYPES & ADAPTERS
+// ============================================================================
 
 // Supabase database types (raw from database)
 export interface SupabasePhoto {
@@ -15,6 +69,7 @@ export interface SupabasePhoto {
   order_index: number;
   is_primary: boolean;
   signedUrl?: string | null;
+  created_at?: string;
 }
 
 export interface SupabaseProfileIntent {
@@ -261,3 +316,306 @@ export function transformEvent(supabaseEvent: SupabaseEvent): Event {
 export function transformEvents(supabaseEvents: SupabaseEvent[]): Event[] {
   return supabaseEvents.map(transformEvent);
 }
+
+// ============================================================================
+// MESSAGE ADAPTERS
+// ============================================================================
+
+export interface SupabaseMessage {
+  id: string;
+  thread_id: string;
+  sender_id: string;
+  message_type: 'text' | 'voice' | 'system' | 'image' | 'video' | 'video_call' | 'gif';
+  content: string;
+  media_storage_path: string | null;
+  media_thumbnail_path?: string | null;
+  is_first_message: boolean;
+  created_at: string;
+  read_at: string | null;
+  // Video call fields
+  call_status?: 'started' | 'ended' | 'missed' | null;
+  call_duration?: number | null;
+  // Self-destruct fields
+  self_destruct_seconds?: number | null;
+  viewed_at?: string | null;
+  is_expired?: boolean | null;
+  // Reply fields
+  reply_to_id?: string | null;
+  reply_to_content?: string | null;
+  reply_to_sender_id?: string | null;
+  // Signed URL (added after fetching)
+  mediaSignedUrl?: string | null;
+  mediaThumbnailSignedUrl?: string | null;
+  // Reactions (joined)
+  message_reactions?: Array<{
+    emoji: string;
+    user_id: string;
+    created_at: string;
+  }>;
+}
+
+/**
+ * Transform Supabase message to App Message type
+ */
+export function transformMessage(supabaseMessage: SupabaseMessage): Message {
+  const reactions: MessageReaction[] = (supabaseMessage.message_reactions || []).map(r => ({
+    emoji: r.emoji,
+    user_id: r.user_id,
+    created_at: r.created_at,
+  }));
+
+  return {
+    id: supabaseMessage.id,
+    thread_id: supabaseMessage.thread_id,
+    sender_id: supabaseMessage.sender_id,
+    message_type: supabaseMessage.message_type,
+    content: supabaseMessage.content,
+    media_url: supabaseMessage.mediaSignedUrl || nullToUndefined(supabaseMessage.media_storage_path),
+    media_thumbnail: supabaseMessage.mediaThumbnailSignedUrl || nullToUndefined(supabaseMessage.media_thumbnail_path),
+    is_first_message: supabaseMessage.is_first_message,
+    created_at: supabaseMessage.created_at,
+    read_at: nullToUndefined(supabaseMessage.read_at),
+    // Video call fields
+    call_status: nullToUndefined(supabaseMessage.call_status),
+    call_duration: nullToUndefined(supabaseMessage.call_duration),
+    // Self-destruct fields
+    self_destruct_seconds: nullToUndefined(supabaseMessage.self_destruct_seconds),
+    viewed_at: nullToUndefined(supabaseMessage.viewed_at),
+    is_expired: nullToUndefined(supabaseMessage.is_expired),
+    // Reply fields
+    reply_to_id: nullToUndefined(supabaseMessage.reply_to_id),
+    reply_to_content: nullToUndefined(supabaseMessage.reply_to_content),
+    reply_to_sender_id: nullToUndefined(supabaseMessage.reply_to_sender_id),
+    // Reactions
+    reactions: reactions.length > 0 ? reactions : undefined,
+  };
+}
+
+/**
+ * Transform array of Supabase messages
+ */
+export function transformMessages(supabaseMessages: SupabaseMessage[]): Message[] {
+  return supabaseMessages.map(transformMessage);
+}
+
+// ============================================================================
+// MATCH ADAPTERS
+// ============================================================================
+
+export interface SupabaseMatch {
+  id: string;
+  user_1_id: string;
+  user_2_id: string;
+  status: 'pending' | 'active' | 'archived';
+  matched_at: string;
+  // Joined data
+  shared_intents?: Array<{ intent_id: string }>;
+  chat_threads?: Array<SupabaseChatThread>;
+}
+
+/**
+ * Transform Supabase match to App Match type
+ */
+export function transformMatch(supabaseMatch: SupabaseMatch): Match {
+  return {
+    id: supabaseMatch.id,
+    user_1_id: supabaseMatch.user_1_id,
+    user_2_id: supabaseMatch.user_2_id,
+    shared_intent_ids: (supabaseMatch.shared_intents || []).map(si => si.intent_id),
+    status: supabaseMatch.status,
+    matched_at: supabaseMatch.matched_at,
+  };
+}
+
+/**
+ * Transform array of Supabase matches
+ */
+export function transformMatches(supabaseMatches: SupabaseMatch[]): Match[] {
+  return supabaseMatches.map(transformMatch);
+}
+
+// ============================================================================
+// CHAT THREAD ADAPTERS
+// ============================================================================
+
+export interface SupabaseChatThread {
+  id: string;
+  match_id: string;
+  unlocked: boolean;
+  first_message_type?: 'prompt' | 'reaction' | 'voice' | null;
+  last_message_at?: string | null;
+  archived_at?: string | null;
+  // Group chat fields
+  is_group?: boolean | null;
+  group_name?: string | null;
+  group_photo_path?: string | null;
+  group_photo_signed_url?: string | null;
+  participant_ids?: string[] | null;
+  created_by?: string | null;
+}
+
+/**
+ * Transform Supabase chat thread to App ChatThread type
+ */
+export function transformChatThread(supabaseThread: SupabaseChatThread): ChatThread {
+  return {
+    id: supabaseThread.id,
+    match_id: supabaseThread.match_id,
+    unlocked: supabaseThread.unlocked,
+    first_message_type: nullToUndefined(supabaseThread.first_message_type),
+    last_message_at: nullToUndefined(supabaseThread.last_message_at),
+    archived_at: nullToUndefined(supabaseThread.archived_at),
+    // Group chat fields
+    is_group: nullToUndefined(supabaseThread.is_group),
+    group_name: nullToUndefined(supabaseThread.group_name),
+    group_photo: supabaseThread.group_photo_signed_url || nullToUndefined(supabaseThread.group_photo_path),
+    participant_ids: nullToUndefined(supabaseThread.participant_ids),
+    created_by: nullToUndefined(supabaseThread.created_by),
+  };
+}
+
+/**
+ * Transform array of Supabase chat threads
+ */
+export function transformChatThreads(supabaseThreads: SupabaseChatThread[]): ChatThread[] {
+  return supabaseThreads.map(transformChatThread);
+}
+
+// ============================================================================
+// LIKE & PIND ADAPTERS
+// ============================================================================
+
+export interface SupabaseLike {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  created_at: string;
+  seen: boolean;
+  // Joined profile data (optional)
+  from_profile?: SupabaseProfile;
+}
+
+/**
+ * Transform Supabase like to App Like type
+ */
+export function transformLike(supabaseLike: SupabaseLike): Like {
+  return {
+    id: supabaseLike.id,
+    from_user_id: supabaseLike.from_user_id,
+    to_user_id: supabaseLike.to_user_id,
+    created_at: supabaseLike.created_at,
+    seen: supabaseLike.seen,
+  };
+}
+
+/**
+ * Transform array of Supabase likes
+ */
+export function transformLikes(supabaseLikes: SupabaseLike[]): Like[] {
+  return supabaseLikes.map(transformLike);
+}
+
+export interface SupabasePind {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  message: string;
+  created_at: string;
+  read: boolean;
+  // Joined profile data (optional)
+  from_profile?: SupabaseProfile;
+}
+
+/**
+ * Transform Supabase pind to App Pind type
+ */
+export function transformPind(supabasePind: SupabasePind): Pind {
+  return {
+    id: supabasePind.id,
+    from_user_id: supabasePind.from_user_id,
+    to_user_id: supabasePind.to_user_id,
+    message: supabasePind.message,
+    created_at: supabasePind.created_at,
+    read: supabasePind.read,
+  };
+}
+
+/**
+ * Transform array of Supabase pinds
+ */
+export function transformPinds(supabasePinds: SupabasePind[]): Pind[] {
+  return supabasePinds.map(transformPind);
+}
+
+// ============================================================================
+// LINKED PARTNER ADAPTERS
+// ============================================================================
+
+export interface SupabaseLinkedPartner {
+  id: string;
+  name: string;
+  age: number;
+  photo_storage_path: string | null;
+  photo_signed_url?: string | null;
+  blend_user_id?: string | null;
+  is_on_blend: boolean;
+  relationship_type?: string | null;
+  relationship_duration?: string | null;
+  link_status?: 'pending' | 'confirmed' | 'declined' | null;
+  linked_at?: string | null;
+  // Joined Blend profile (if linked)
+  blend_profile?: SupabaseProfile;
+}
+
+/**
+ * Transform Supabase linked partner to App LinkedPartner type
+ */
+export function transformLinkedPartner(supabasePartner: SupabaseLinkedPartner): LinkedPartner {
+  return {
+    id: supabasePartner.id,
+    name: supabasePartner.name,
+    age: supabasePartner.age,
+    photo: supabasePartner.photo_signed_url || nullToUndefined(supabasePartner.photo_storage_path),
+    blend_user_id: nullToUndefined(supabasePartner.blend_user_id),
+    blend_profile: supabasePartner.blend_profile 
+      ? transformProfile(supabasePartner.blend_profile) 
+      : undefined,
+    is_on_blend: supabasePartner.is_on_blend,
+    relationship_type: nullToUndefined(supabasePartner.relationship_type) as LinkedPartner['relationship_type'],
+    relationship_duration: nullToUndefined(supabasePartner.relationship_duration),
+    link_status: nullToUndefined(supabasePartner.link_status),
+    linked_at: nullToUndefined(supabasePartner.linked_at),
+  };
+}
+
+// ============================================================================
+// TYPE GUARDS
+// ============================================================================
+
+/**
+ * Check if a value is a Supabase profile (has photos as objects)
+ */
+export function isSupabaseProfile(profile: unknown): profile is SupabaseProfile {
+  if (!profile || typeof profile !== 'object') return false;
+  const p = profile as Record<string, unknown>;
+  return 'id' in p && 'user_id' in p && 'display_name' in p;
+}
+
+/**
+ * Check if a profile has been transformed (has photos as strings)
+ */
+export function isAppProfile(profile: unknown): profile is Profile {
+  if (!profile || typeof profile !== 'object') return false;
+  const p = profile as Record<string, unknown>;
+  if (!('photos' in p) || !Array.isArray(p.photos)) return false;
+  return p.photos.length === 0 || typeof p.photos[0] === 'string';
+}
+
+/**
+ * Ensure a profile is in App format, transforming if needed
+ */
+export function ensureAppProfile(profile: SupabaseProfile | Profile): Profile {
+  if (isAppProfile(profile)) return profile;
+  return transformProfile(profile as SupabaseProfile);
+}
+

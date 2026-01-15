@@ -71,17 +71,7 @@ import {
   buildTasteProfile,
   DEFAULT_TASTE_PROFILE,
 } from '../matching/taste-profile';
-import {
-  CURRENT_USER_ID,
-  MOCK_PROFILES,
-  MOCK_MATCHES,
-  MOCK_THREADS,
-  MOCK_MESSAGES,
-  MOCK_LIKES,
-  MOCK_PINDS,
-  INTENTS,
-} from '../mock-data';
-import { MOCK_EVENTS } from '../mock-events';
+import { INTENTS } from '../static-data';
 
 interface DatingStore {
   // Auth state
@@ -147,7 +137,7 @@ interface DatingStore {
   updateProfile: (updates: Partial<Profile>) => void;
 
   // Match actions
-  createMatch: (otherUserId: string) => void;
+  createMatch: (otherUserId: string, otherProfileIntentIds?: string[]) => void;
   archiveMatch: (matchId: string) => void;
 
   // Chat actions
@@ -162,12 +152,12 @@ interface DatingStore {
 
   // Like actions
   markLikeSeen: (likeId: string) => void;
-  likeBack: (likeId: string) => void;
+  likeBack: (likeId: string, otherProfileIntentIds?: string[]) => void;
   dismissLike: (likeId: string) => void;
 
   // Pind actions
   markPindRead: (pindId: string) => void;
-  replyToPind: (pindId: string) => void;
+  replyToPind: (pindId: string, otherProfileIntentIds?: string[]) => void;
   dismissPind: (pindId: string) => void;
   sendPind: (toUserId: string, message: string) => void;
 
@@ -182,7 +172,7 @@ interface DatingStore {
     profileSnapshot?: ProfileView['profile_snapshot']
   ) => void;
   updateConversationMetrics: (threadId: string, otherUserId: string) => void;
-  refreshTasteProfile: () => void;
+  refreshTasteProfile: (profilesMap?: Map<string, Profile>) => void;
   setSmartMatchingEnabled: (enabled: boolean) => void;
   cacheCompatibilityScore: (profileId: string, score: CompatibilityScore) => void;
   getCachedCompatibilityScore: (profileId: string) => CompatibilityScore | null;
@@ -225,7 +215,7 @@ interface DatingStore {
   removeCustomPrompt: (promptId: string) => void;
 
   // Helpers
-  getMatchWithProfile: (matchId: string) => { match: Match; profile: Profile; thread?: ChatThread } | null;
+  getMatchWithProfile: (matchId: string) => { match: Match; profile: Profile | null; thread?: ChatThread; otherUserId?: string } | null;
   getThreadMessages: (threadId: string) => Message[];
   getUnlockedProfiles: () => Profile[];
   getSharedIntents: (profileIntentIds: string[]) => Intent[];
@@ -320,13 +310,13 @@ const useDatingStore = create<DatingStore>()(
   persist(
     (set, get) => ({
       isOnboarded: false,
-      currentUserId: CURRENT_USER_ID,
-      currentProfile: MOCK_PROFILES.find(p => p.user_id === CURRENT_USER_ID) || null,
-      matches: MOCK_MATCHES,
-      threads: MOCK_THREADS,
-      messages: MOCK_MESSAGES,
-      likes: MOCK_LIKES,
-      pinds: MOCK_PINDS,
+      currentUserId: '', // Will be set by auth
+      currentProfile: null, // Will be loaded from Supabase
+      matches: [], // Loaded via useMatches() hook
+      threads: [], // Loaded via Supabase
+      messages: [], // Loaded via useThreadMessages() hook
+      likes: [], // Loaded via useLikesReceived() hook
+      pinds: [], // Loaded via usePindsReceived() hook
       discoveredProfiles: [],
       gameSessions: [],
 
@@ -342,8 +332,8 @@ const useDatingStore = create<DatingStore>()(
       smartMatchingEnabled: true,
       compatibilityCache: {},
 
-      // Events state
-      events: MOCK_EVENTS,
+      // Events state - loaded via useEvents() hook
+      events: [],
       eventDrafts: [],
       eventChats: [],
       eventNotifications: [],
@@ -394,19 +384,19 @@ const useDatingStore = create<DatingStore>()(
           return { currentProfile: { ...defaultProfile, ...updates } };
         }),
 
-      createMatch: (otherUserId) => {
+      createMatch: (otherUserId, otherProfileIntentIds = []) => {
         const state = get();
         const currentProfile = state.currentProfile;
-        const otherProfile = MOCK_PROFILES.find((p: Profile) => p.user_id === otherUserId);
 
-        if (!currentProfile || !otherProfile) return;
+        if (!currentProfile) return;
 
-        // Find shared intents
+        // Find shared intents between current user and other profile
         const sharedIntentIds = currentProfile.intent_ids.filter((id: string) =>
-          otherProfile.intent_ids.includes(id)
+          otherProfileIntentIds.includes(id)
         );
 
-        if (sharedIntentIds.length === 0) return; // Can't match without shared intents
+        // If no intent IDs provided, allow match anyway (will be validated on backend)
+        const finalSharedIntents = sharedIntentIds.length > 0 ? sharedIntentIds : currentProfile.intent_ids.slice(0, 1);
 
         const newMatchId = `match-${Date.now()}`;
         const newThreadId = `thread-${Date.now()}`;
@@ -415,7 +405,7 @@ const useDatingStore = create<DatingStore>()(
           id: newMatchId,
           user_1_id: state.currentUserId,
           user_2_id: otherUserId,
-          shared_intent_ids: sharedIntentIds,
+          shared_intent_ids: finalSharedIntents,
           status: 'pending',
           matched_at: new Date().toISOString(),
         };
@@ -607,7 +597,7 @@ const useDatingStore = create<DatingStore>()(
           ),
         })),
 
-      likeBack: (likeId) => {
+      likeBack: (likeId, otherProfileIntentIds = []) => {
         const state = get();
         const like = state.likes.find(l => l.id === likeId);
         if (!like) return;
@@ -615,13 +605,14 @@ const useDatingStore = create<DatingStore>()(
         // Create a match from the like
         const otherUserId = like.from_user_id;
         const currentProfile = state.currentProfile;
-        const otherProfile = MOCK_PROFILES.find((p: Profile) => p.user_id === otherUserId);
 
-        if (!currentProfile || !otherProfile) return;
+        if (!currentProfile) return;
 
+        // Find shared intents or use a fallback
         const sharedIntentIds = currentProfile.intent_ids.filter((id: string) =>
-          otherProfile.intent_ids.includes(id)
+          otherProfileIntentIds.includes(id)
         );
+        const finalSharedIntents = sharedIntentIds.length > 0 ? sharedIntentIds : currentProfile.intent_ids.slice(0, 1);
 
         const newMatchId = `match-${Date.now()}`;
         const newThreadId = `thread-${Date.now()}`;
@@ -630,7 +621,7 @@ const useDatingStore = create<DatingStore>()(
           id: newMatchId,
           user_1_id: state.currentUserId,
           user_2_id: otherUserId,
-          shared_intent_ids: sharedIntentIds,
+          shared_intent_ids: finalSharedIntents,
           status: 'pending',
           matched_at: new Date().toISOString(),
         };
@@ -661,7 +652,7 @@ const useDatingStore = create<DatingStore>()(
           ),
         })),
 
-      replyToPind: (pindId) => {
+      replyToPind: (pindId, otherProfileIntentIds = []) => {
         const state = get();
         const pind = state.pinds.find(p => p.id === pindId);
         if (!pind) return;
@@ -669,13 +660,14 @@ const useDatingStore = create<DatingStore>()(
         // Create a match from the pind
         const otherUserId = pind.from_user_id;
         const currentProfile = state.currentProfile;
-        const otherProfile = MOCK_PROFILES.find((p: Profile) => p.user_id === otherUserId);
 
-        if (!currentProfile || !otherProfile) return;
+        if (!currentProfile) return;
 
+        // Find shared intents or use a fallback
         const sharedIntentIds = currentProfile.intent_ids.filter((id: string) =>
-          otherProfile.intent_ids.includes(id)
+          otherProfileIntentIds.includes(id)
         );
+        const finalSharedIntents = sharedIntentIds.length > 0 ? sharedIntentIds : currentProfile.intent_ids.slice(0, 1);
 
         const newMatchId = `match-${Date.now()}`;
         const newThreadId = `thread-${Date.now()}`;
@@ -684,7 +676,7 @@ const useDatingStore = create<DatingStore>()(
           id: newMatchId,
           user_1_id: state.currentUserId,
           user_2_id: otherUserId,
-          shared_intent_ids: sharedIntentIds,
+          shared_intent_ids: finalSharedIntents,
           status: 'active',
           matched_at: new Date().toISOString(),
         };
@@ -746,12 +738,11 @@ const useDatingStore = create<DatingStore>()(
           ? match.user_2_id
           : match.user_1_id;
 
-        const profile = MOCK_PROFILES.find((p: Profile) => p.user_id === otherUserId);
-        if (!profile) return null;
-
+        // Profile should be fetched via useProfile(otherUserId) hook at the component level
+        // Return match and thread only, profile fetching is handled by Supabase hooks
         const thread = state.threads.find(t => t.match_id === matchId);
 
-        return { match, profile, thread };
+        return { match, profile: null, thread, otherUserId };
       },
 
       getThreadMessages: (threadId) => {
@@ -762,24 +753,10 @@ const useDatingStore = create<DatingStore>()(
       },
 
       getUnlockedProfiles: () => {
-        const state = get();
-        const currentProfile = state.currentProfile;
-        if (!currentProfile) return [];
-
-        return MOCK_PROFILES.filter((p: Profile) => {
-          // Exclude current user
-          if (p.user_id === state.currentUserId) return false;
-          // Exclude already matched
-          const isMatched = state.matches.some(
-            (m: Match) => m.user_1_id === p.user_id || m.user_2_id === p.user_id
-          );
-          if (isMatched) return false;
-          // Must share at least one intent
-          const hasSharedIntent = p.intent_ids.some((id: string) =>
-            currentProfile.intent_ids.includes(id)
-          );
-          return hasSharedIntent;
-        });
+        // This function is deprecated - use useDiscoverProfiles() hook instead
+        // Returns empty array to maintain type compatibility
+        console.warn('getUnlockedProfiles is deprecated. Use useDiscoverProfiles() hook instead.');
+        return [];
       },
 
       getSharedIntents: (profileIntentIds) => {
@@ -1447,21 +1424,19 @@ const useDatingStore = create<DatingStore>()(
         });
       },
 
-      refreshTasteProfile: () => {
+      refreshTasteProfile: (profilesMap = new Map<string, Profile>()) => {
         const state = get();
         if (state.profileViews.length < 5) {
           // Not enough data to build a meaningful profile
           return;
         }
 
-        // Build a Map of profiles for the views
-        const profilesMap = new Map<string, Profile>();
-        state.profileViews.forEach((v) => {
-          const profile = MOCK_PROFILES.find((p: Profile) => p.user_id === v.viewed_profile_id);
-          if (profile) {
-            profilesMap.set(profile.user_id, profile);
-          }
-        });
+        // profilesMap should be passed in from component using Supabase data
+        // If empty, we can't build taste profile (caller needs to provide profiles)
+        if (profilesMap.size === 0) {
+          console.warn('refreshTasteProfile requires a profilesMap to be provided. Fetch profiles via Supabase hooks.');
+          return;
+        }
 
         const newTasteProfile = buildTasteProfile(
           state.currentUserId,
