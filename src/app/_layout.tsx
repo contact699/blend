@@ -8,6 +8,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useRealtimeAll } from '@/lib/supabase';
 import { usePushNotifications } from '@/lib/notifications';
+import { initSentry } from '@/lib/sentry';
+
+// Initialize Sentry error tracking as early as possible
+initSentry();
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
