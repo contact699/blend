@@ -72,6 +72,7 @@ function AppContent() {
             <Stack.Screen name="leave-review" options={{ presentation: 'modal' }} />
             <Stack.Screen name="vouch-user" options={{ presentation: 'modal' }} />
             <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="moderation" />
             <Stack.Screen name="+not-found" />
           </Stack>
         </ThemeProvider>
