@@ -16,8 +16,8 @@ export {
   useSendMessage,
   useMarkMessagesRead,
   useLikesReceived,
-  useSendPind,
-  usePindsReceived,
+  useSendPing,
+  usePingsReceived,
   useBlockUser,
   useReportUser,
   useDiscoverProfiles,
@@ -78,11 +78,11 @@ export {
   // Thread adapters
   transformChatThread,
   transformChatThreads,
-  // Like & Pind adapters
+  // Like & Ping adapters
   transformLike,
   transformLikes,
-  transformPind,
-  transformPinds,
+  transformPing,
+  transformPings,
   // Partner adapters
   transformLinkedPartner,
   // Type guards
@@ -102,7 +102,7 @@ export type {
   SupabaseMatch,
   SupabaseChatThread,
   SupabaseLike,
-  SupabasePind,
+  SupabasePing,
   SupabaseLinkedPartner,
 } from './adapters';
 
@@ -113,7 +113,7 @@ export {
   useRealtimeMessages,
   useRealtimeMatches,
   useRealtimeLikes,
-  useRealtimePinds,
+  useRealtimePings,
   useRealtimeEvents,
   useRealtimeAll,
 } from './realtime';

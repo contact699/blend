@@ -163,8 +163,8 @@ export interface Like {
   seen: boolean;
 }
 
-// Pind (private message without matching)
-export interface Pind {
+// Ping (private message without matching)
+export interface Ping {
   id: string;
   from_user_id: string;
   to_user_id: string;

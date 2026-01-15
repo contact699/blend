@@ -20,7 +20,7 @@ import {
   ChatThread, 
   Message, 
   Like, 
-  Pind,
+  Ping,
   MessageReaction,
   LinkedPartner,
 } from '../types';
@@ -482,7 +482,7 @@ export function transformChatThreads(supabaseThreads: SupabaseChatThread[]): Cha
 }
 
 // ============================================================================
-// LIKE & PIND ADAPTERS
+// LIKE & PING ADAPTERS
 // ============================================================================
 
 export interface SupabaseLike {
@@ -515,7 +515,7 @@ export function transformLikes(supabaseLikes: SupabaseLike[]): Like[] {
   return supabaseLikes.map(transformLike);
 }
 
-export interface SupabasePind {
+export interface SupabasePing {
   id: string;
   from_user_id: string;
   to_user_id: string;
@@ -527,24 +527,24 @@ export interface SupabasePind {
 }
 
 /**
- * Transform Supabase pind to App Pind type
+ * Transform Supabase ping to App Ping type
  */
-export function transformPind(supabasePind: SupabasePind): Pind {
+export function transformPing(supabasePing: SupabasePing): Ping {
   return {
-    id: supabasePind.id,
-    from_user_id: supabasePind.from_user_id,
-    to_user_id: supabasePind.to_user_id,
-    message: supabasePind.message,
-    created_at: supabasePind.created_at,
-    read: supabasePind.read,
+    id: supabasePing.id,
+    from_user_id: supabasePing.from_user_id,
+    to_user_id: supabasePing.to_user_id,
+    message: supabasePing.message,
+    created_at: supabasePing.created_at,
+    read: supabasePing.read,
   };
 }
 
 /**
- * Transform array of Supabase pinds
+ * Transform array of Supabase pings
  */
-export function transformPinds(supabasePinds: SupabasePind[]): Pind[] {
-  return supabasePinds.map(transformPind);
+export function transformPings(supabasePings: SupabasePing[]): Ping[] {
+  return supabasePings.map(transformPing);
 }
 
 // ============================================================================

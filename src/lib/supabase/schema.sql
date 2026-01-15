@@ -470,9 +470,9 @@ CREATE POLICY "Senders can delete their likes" ON public.likes
   FOR DELETE USING (auth.uid() = from_user_id);
 
 -- ============================================================================
--- PINDS TABLE (Private messages without matching)
+-- PINGS TABLE (Private messages without matching)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.pinds (
+CREATE TABLE IF NOT EXISTS public.pings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   from_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   to_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -482,23 +482,23 @@ CREATE TABLE IF NOT EXISTS public.pinds (
   CONSTRAINT different_users CHECK (from_user_id != to_user_id)
 );
 
-ALTER TABLE public.pinds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pings ENABLE ROW LEVEL SECURITY;
 
--- Users can only see pinds sent TO them or FROM them
-DROP POLICY IF EXISTS "Users can see pinds involving them" ON public.pinds;
-CREATE POLICY "Users can see pinds involving them" ON public.pinds
+-- Users can only see pings sent TO them or FROM them
+DROP POLICY IF EXISTS "Users can see pings involving them" ON public.pings;
+CREATE POLICY "Users can see pings involving them" ON public.pings
   FOR SELECT USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
 
-DROP POLICY IF EXISTS "Users can create pinds from themselves" ON public.pinds;
-CREATE POLICY "Users can create pinds from themselves" ON public.pinds
+DROP POLICY IF EXISTS "Users can create pings from themselves" ON public.pings;
+CREATE POLICY "Users can create pings from themselves" ON public.pings
   FOR INSERT WITH CHECK (auth.uid() = from_user_id);
 
-DROP POLICY IF EXISTS "Recipients can update pind read status" ON public.pinds;
-CREATE POLICY "Recipients can update pind read status" ON public.pinds
+DROP POLICY IF EXISTS "Recipients can update ping read status" ON public.pings;
+CREATE POLICY "Recipients can update ping read status" ON public.pings
   FOR UPDATE USING (auth.uid() = to_user_id);
 
-DROP POLICY IF EXISTS "Users can delete their pinds" ON public.pinds;
-CREATE POLICY "Users can delete their pinds" ON public.pinds
+DROP POLICY IF EXISTS "Users can delete their pings" ON public.pings;
+CREATE POLICY "Users can delete their pings" ON public.pings
   FOR DELETE USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
 
 -- ============================================================================
@@ -613,7 +613,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_threads_match_id ON public.chat_threads(matc
 CREATE INDEX IF NOT EXISTS idx_messages_thread_id ON public.messages(thread_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_likes_to_user ON public.likes(to_user_id);
-CREATE INDEX IF NOT EXISTS idx_pinds_to_user ON public.pinds(to_user_id);
+CREATE INDEX IF NOT EXISTS idx_pings_to_user ON public.pings(to_user_id);
 CREATE INDEX IF NOT EXISTS idx_blocked_users_both ON public.blocked_users(blocker_id, blocked_id);
 
 -- ============================================================================

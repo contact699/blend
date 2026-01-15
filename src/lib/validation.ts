@@ -151,9 +151,9 @@ export const messageContentSchema = z
   .transform(sanitizeMultilineText);
 
 /**
- * Pind message validation
+ * Ping message validation
  */
-export const pindMessageSchema = z
+export const pingMessageSchema = z
   .string()
   .min(1, 'Message cannot be empty')
   .max(500, 'Message too long (max 500 characters)')
@@ -257,11 +257,11 @@ export const createMessageSchema = z.object({
 });
 
 /**
- * Pind creation schema
+ * Ping creation schema
  */
-export const createPindSchema = z.object({
+export const createPingSchema = z.object({
   to_user_id: uuidSchema,
-  message: pindMessageSchema,
+  message: pingMessageSchema,
 });
 
 /**

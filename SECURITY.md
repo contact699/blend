@@ -10,7 +10,7 @@ All tables have RLS enabled with policies that ensure:
 - Profiles are visible to authenticated users (except blocked users)
 - Match data is only accessible to match participants
 - Messages are only accessible to conversation participants
-- Likes/Pinds are only visible to sender and recipient
+- Likes/Pings are only visible to sender and recipient
 
 **To set up:** Run the SQL in `src/lib/supabase/schema.sql` in your Supabase SQL Editor.
 
@@ -77,7 +77,7 @@ All user inputs are validated using Zod schemas:
 | City | Max 50 chars |
 | Bio | Max 500 chars |
 | Message | 1-2000 chars |
-| Pind | 1-500 chars |
+| Ping | 1-500 chars |
 
 ### Sanitization
 - HTML tags are stripped

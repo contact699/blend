@@ -38,7 +38,7 @@ Successfully replaced hardcoded MOCK_PROFILES with live Supabase queries in:
 **Solution:** Created comprehensive type adapters in `/src/lib/supabase/adapters.ts`
 
 **What was done:**
-- ✅ Created adapter functions: `transformProfile`, `transformMessage`, `transformMatch`, `transformChatThread`, `transformLike`, `transformPind`, `transformLinkedPartner`
+- ✅ Created adapter functions: `transformProfile`, `transformMessage`, `transformMatch`, `transformChatThread`, `transformLike`, `transformPing`, `transformLinkedPartner`
 - ✅ Added utility functions: `nullToUndefined`, `undefinedToNull`, `parseDate`
 - ✅ Added type guards: `isSupabaseProfile`, `isAppProfile`, `ensureAppProfile`
 - ✅ Fixed photo URL handling (signed URLs vs string paths)
@@ -312,7 +312,7 @@ Located in `/src/lib/supabase/adapters.ts`:
 - `transformMessage()` / `transformMessages()` - Handle media URLs and reactions
 - `transformMatch()` / `transformMatches()` - Handle shared intents
 - `transformChatThread()` / `transformChatThreads()` - Handle group chat fields
-- `transformLike()` / `transformPind()` - Simple type conversions
+- `transformLike()` / `transformPing()` - Simple type conversions
 - `transformLinkedPartner()` - Handle blend profile joins
 - `transformEvent()` / `transformEvents()` - Handle event hosts and RSVPs
 - Utility: `nullToUndefined()`, `undefinedToNull()`, `parseDate()`

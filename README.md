@@ -416,7 +416,7 @@ src/
 │   │   ├── discover.tsx     # Discover screen (swipe profiles with smart matching)
 │   │   ├── events.tsx       # Events discovery and listing
 │   │   ├── likes.tsx        # See who liked you
-│   │   ├── pinds.tsx        # Pings - private messages without matching
+│   │   ├── pings.tsx        # Pings - private messages without matching
 │   │   ├── inbox.tsx        # Messages inbox (direct + group chats)
 │   │   └── profile.tsx      # User profile (with linked partner display)
 │   ├── onboarding/          # Onboarding flow

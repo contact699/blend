@@ -4,10 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Mail, X, MessageCircle, MapPin, Sparkles, Send, User } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usePindsReceived, useCurrentUser, supabase } from '@/lib/supabase';
+import { usePingsReceived, useCurrentUser, supabase } from '@/lib/supabase';
 import { getSignedPhotoUrls } from '@/lib/supabase/photos';
 
-interface PindWithProfile {
+interface PingWithProfile {
   id: string;
   from_user_id: string;
   to_user_id: string;
@@ -25,18 +25,18 @@ interface PindWithProfile {
   };
 }
 
-export default function PindsScreen() {
+export default function PingsScreen() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
-  const { data: pinds, isLoading } = usePindsReceived();
+  const { data: pings, isLoading } = usePingsReceived();
 
-  // Fetch profiles for all pinds
-  const { data: pindsWithProfiles } = useQuery({
-    queryKey: ['pinds-with-profiles', pinds],
+  // Fetch profiles for all pings
+  const { data: pingsWithProfiles } = useQuery({
+    queryKey: ['pings-with-profiles', pings],
     queryFn: async () => {
-      if (!pinds || pinds.length === 0) return [];
+      if (!pings || pings.length === 0) return [];
 
-      const userIds = pinds.map((p) => p.from_user_id);
+      const userIds = pings.map((p) => p.from_user_id);
 
       // Fetch profiles for all users who pinged us
       const { data: profiles, error } = await supabase
@@ -49,7 +49,7 @@ export default function PindsScreen() {
 
       if (error) {
         console.error('Error fetching profiles:', error);
-        return pinds.map((p) => ({ ...p, profile: undefined }));
+        return pings.map((p) => ({ ...p, profile: undefined }));
       }
 
       // Get signed URLs for all photos
@@ -59,13 +59,13 @@ export default function PindsScreen() {
       );
       const signedUrls = await getSignedPhotoUrls(allPhotoPaths);
 
-      // Map profiles to pinds
-      return pinds.map((pind) => {
+      // Map profiles to pings
+      return pings.map((ping) => {
         const profile = (profiles ?? []).find(
-          (p: { user_id: string }) => p.user_id === pind.from_user_id
+          (p: { user_id: string }) => p.user_id === ping.from_user_id
         );
         return {
-          ...pind,
+          ...ping,
           profile: profile
             ? {
                 ...profile,
@@ -81,12 +81,12 @@ export default function PindsScreen() {
         };
       });
     },
-    enabled: !!pinds && pinds.length > 0,
+    enabled: !!pings && pings.length > 0,
   });
 
-  // Mutation to reply to pind (create match and chat)
+  // Mutation to reply to ping (create match and chat)
   const replyMutation = useMutation({
-    mutationFn: async (pind: PindWithProfile) => {
+    mutationFn: async (ping: PingWithProfile) => {
       if (!currentUser) throw new Error('Not authenticated');
 
       // Create a match
@@ -94,7 +94,7 @@ export default function PindsScreen() {
         .from('matches')
         .insert({
           user_1_id: currentUser.id,
-          user_2_id: pind.from_user_id,
+          user_2_id: ping.from_user_id,
           status: 'active',
         })
         .select()
@@ -104,43 +104,43 @@ export default function PindsScreen() {
         throw matchError;
       }
 
-      // Mark the pind as read
-      await supabase.from('pinds').update({ read: true }).eq('id', pind.id);
+      // Mark the ping as read
+      await supabase.from('pings').update({ read: true }).eq('id', ping.id);
 
       return match;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pinds'] });
+      queryClient.invalidateQueries({ queryKey: ['pings'] });
       queryClient.invalidateQueries({ queryKey: ['matches'] });
     },
   });
 
-  // Mutation to dismiss a pind
+  // Mutation to dismiss a ping
   const dismissMutation = useMutation({
-    mutationFn: async (pindId: string) => {
-      const { error } = await supabase.from('pinds').delete().eq('id', pindId);
+    mutationFn: async (pingId: string) => {
+      const { error } = await supabase.from('pings').delete().eq('id', pingId);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pinds'] });
+      queryClient.invalidateQueries({ queryKey: ['pings'] });
     },
   });
 
-  // Mutation to mark pind as read
+  // Mutation to mark ping as read
   const markReadMutation = useMutation({
-    mutationFn: async (pindId: string) => {
+    mutationFn: async (pingId: string) => {
       const { error } = await supabase
-        .from('pinds')
+        .from('pings')
         .update({ read: true })
-        .eq('id', pindId);
+        .eq('id', pingId);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pinds'] });
+      queryClient.invalidateQueries({ queryKey: ['pings'] });
     },
   });
 
-  const myPinds = pindsWithProfiles ?? [];
+  const myPings = pingsWithProfiles ?? [];
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -155,31 +155,31 @@ export default function PindsScreen() {
     return date.toLocaleDateString();
   };
 
-  const handleReply = (pind: PindWithProfile) => {
-    replyMutation.mutate(pind);
+  const handleReply = (ping: PingWithProfile) => {
+    replyMutation.mutate(ping);
   };
 
-  const handleDismiss = (pind: PindWithProfile) => {
-    dismissMutation.mutate(pind.id);
+  const handleDismiss = (ping: PingWithProfile) => {
+    dismissMutation.mutate(ping.id);
   };
 
-  const handleViewPind = (pind: PindWithProfile) => {
-    if (!pind.read) {
-      markReadMutation.mutate(pind.id);
+  const handleViewPing = (ping: PingWithProfile) => {
+    if (!ping.read) {
+      markReadMutation.mutate(ping.id);
     }
   };
 
-  const renderPindItem = (pind: PindWithProfile, index: number) => {
-    const profile = pind.profile;
+  const renderPingItem = (ping: PingWithProfile, index: number) => {
+    const profile = ping.profile;
 
     return (
       <Animated.View
-        key={pind.id}
+        key={ping.id}
         entering={FadeInDown.delay(index * 80).springify()}
         className="mb-4"
       >
         <Pressable
-          onPress={() => handleViewPind(pind)}
+          onPress={() => handleViewPing(ping)}
           className="bg-zinc-900/80 rounded-2xl overflow-hidden border border-zinc-800"
         >
           {/* Header with profile info */}
@@ -195,7 +195,7 @@ export default function PindsScreen() {
                   <User size={24} color="#6b7280" />
                 </View>
               )}
-              {!pind.read && (
+              {!ping.read && (
                 <View className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full border-2 border-zinc-900" />
               )}
             </View>
@@ -204,7 +204,7 @@ export default function PindsScreen() {
                 <Text className="text-white text-lg font-semibold">
                   {profile?.display_name ?? 'Unknown'}{profile?.age ? `, ${profile.age}` : ''}
                 </Text>
-                <Text className="text-gray-500 text-xs">{formatTime(pind.created_at)}</Text>
+                <Text className="text-gray-500 text-xs">{formatTime(ping.created_at)}</Text>
               </View>
               {profile?.city && (
                 <View className="flex-row items-center mt-1">
@@ -221,7 +221,7 @@ export default function PindsScreen() {
               <View className="flex-row items-center mb-2">
                 <Send size={14} color="#c084fc" />
                 <Text className="text-purple-300 text-xs font-medium ml-1">Private Message</Text>
-                {!pind.read && (
+                {!ping.read && (
                   <View className="ml-2 bg-purple-500/20 px-2 py-0.5 rounded-full flex-row items-center">
                     <Sparkles size={10} color="#c084fc" />
                     <Text className="text-purple-300 text-xs ml-1">New</Text>
@@ -229,7 +229,7 @@ export default function PindsScreen() {
                 )}
               </View>
               <Text className="text-gray-200 text-base leading-relaxed">
-                "{pind.message}"
+                "{ping.message}"
               </Text>
             </View>
           </View>
@@ -237,7 +237,7 @@ export default function PindsScreen() {
           {/* Action buttons */}
           <View className="flex-row px-4 pb-4 gap-3">
             <Pressable
-              onPress={() => handleDismiss(pind)}
+              onPress={() => handleDismiss(ping)}
               disabled={dismissMutation.isPending}
               className="flex-1 bg-zinc-800 py-3 rounded-xl flex-row items-center justify-center active:bg-zinc-700"
             >
@@ -245,7 +245,7 @@ export default function PindsScreen() {
               <Text className="text-gray-300 font-medium ml-2">Dismiss</Text>
             </Pressable>
             <Pressable
-              onPress={() => handleReply(pind)}
+              onPress={() => handleReply(ping)}
               disabled={replyMutation.isPending}
               className="flex-1 rounded-xl flex-row items-center justify-center overflow-hidden active:opacity-80"
             >
@@ -303,10 +303,10 @@ export default function PindsScreen() {
               <Mail size={24} color="#c084fc" />
               <Text className="text-white text-2xl font-bold ml-2">Pings</Text>
             </View>
-            {myPinds.length > 0 && (
+            {myPings.length > 0 && (
               <View className="bg-purple-500/20 px-3 py-1 rounded-full border border-purple-500/30">
                 <Text className="text-purple-300 font-semibold">
-                  {myPinds.length} {myPinds.length === 1 ? 'message' : 'messages'}
+                  {myPings.length} {myPings.length === 1 ? 'message' : 'messages'}
                 </Text>
               </View>
             )}
@@ -320,7 +320,7 @@ export default function PindsScreen() {
           </View>
 
           {/* Pings List */}
-          {myPinds.length === 0 ? (
+          {myPings.length === 0 ? (
             <View className="flex-1 items-center justify-center px-6">
               <View className="w-24 h-24 bg-zinc-900 rounded-full items-center justify-center mb-4 border border-zinc-800">
                 <Mail size={40} color="#6b7280" />
@@ -332,10 +332,10 @@ export default function PindsScreen() {
             </View>
           ) : (
             <FlatList
-              data={myPinds}
+              data={myPings}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-              renderItem={({ item, index }) => renderPindItem(item, index)}
+              renderItem={({ item, index }) => renderPingItem(item, index)}
               showsVerticalScrollIndicator={false}
             />
           )}

@@ -48,7 +48,7 @@
 │   │   │   ├── discover.tsx     # Swipe profiles with AI matching
 │   │   │   ├── events.tsx       # Browse events
 │   │   │   ├── likes.tsx        # See who liked you
-│   │   │   ├── pinds.tsx        # Pings (DMs without matching)
+│   │   │   ├── pings.tsx        # Pings (DMs without matching)
 │   │   │   ├── inbox.tsx        # Messages inbox
 │   │   │   └── profile.tsx      # User profile
 │   │   ├── onboarding/          # Onboarding flow

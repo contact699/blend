@@ -8,7 +8,7 @@ import {
   Message,
   Intent,
   Like,
-  Pind,
+  Ping,
   MessageReaction,
   GameSession,
   GameType,
@@ -86,9 +86,9 @@ interface DatingStore {
   threads: ChatThread[];
   messages: Message[];
 
-  // Likes and Pinds
+  // Likes and Pings
   likes: Like[];
-  pinds: Pind[];
+  pings: Ping[];
 
   // Discover
   discoveredProfiles: string[]; // IDs of profiles user has seen
@@ -155,11 +155,11 @@ interface DatingStore {
   likeBack: (likeId: string, otherProfileIntentIds?: string[]) => void;
   dismissLike: (likeId: string) => void;
 
-  // Pind actions
-  markPindRead: (pindId: string) => void;
-  replyToPind: (pindId: string, otherProfileIntentIds?: string[]) => void;
-  dismissPind: (pindId: string) => void;
-  sendPind: (toUserId: string, message: string) => void;
+  // Ping actions
+  markPingRead: (pingId: string) => void;
+  replyToPing: (pingId: string, otherProfileIntentIds?: string[]) => void;
+  dismissPing: (pingId: string) => void;
+  sendPing: (toUserId: string, message: string) => void;
 
   // Discover actions
   markProfileSeen: (profileId: string) => void;
@@ -221,7 +221,7 @@ interface DatingStore {
   getSharedIntents: (profileIntentIds: string[]) => Intent[];
   checkAutoArchive: () => void;
   getUnseenLikesCount: () => number;
-  getUnreadPindsCount: () => number;
+  getUnreadPingsCount: () => number;
 
   // Event actions
   createEvent: (event: Omit<Event, 'id' | 'created_at' | 'updated_at' | 'current_attendees' | 'waitlist_count' | 'attendees'>) => Event;
@@ -316,7 +316,7 @@ const useDatingStore = create<DatingStore>()(
       threads: [], // Loaded via Supabase
       messages: [], // Loaded via useThreadMessages() hook
       likes: [], // Loaded via useLikesReceived() hook
-      pinds: [], // Loaded via usePindsReceived() hook
+      pings: [], // Loaded via usePingsReceived() hook
       discoveredProfiles: [],
       gameSessions: [],
 
@@ -644,21 +644,21 @@ const useDatingStore = create<DatingStore>()(
           likes: state.likes.filter(l => l.id !== likeId),
         })),
 
-      // Pind actions
-      markPindRead: (pindId) =>
+      // Ping actions
+      markPingRead: (pingId) =>
         set((state) => ({
-          pinds: state.pinds.map(p =>
-            p.id === pindId ? { ...p, read: true } : p
+          pings: state.pings.map(p =>
+            p.id === pingId ? { ...p, read: true } : p
           ),
         })),
 
-      replyToPind: (pindId, otherProfileIntentIds = []) => {
+      replyToPing: (pingId, otherProfileIntentIds = []) => {
         const state = get();
-        const pind = state.pinds.find(p => p.id === pindId);
-        if (!pind) return;
+        const ping = state.pings.find(p => p.id === pingId);
+        if (!ping) return;
 
-        // Create a match from the pind
-        const otherUserId = pind.from_user_id;
+        // Create a match from the ping
+        const otherUserId = ping.from_user_id;
         const currentProfile = state.currentProfile;
 
         if (!currentProfile) return;
@@ -689,34 +689,34 @@ const useDatingStore = create<DatingStore>()(
           last_message_at: new Date().toISOString(),
         };
 
-        // Create initial message from their pind
+        // Create initial message from their ping
         const initialMessage: Message = {
           id: `msg-${Date.now()}`,
           thread_id: newThreadId,
           sender_id: otherUserId,
           message_type: 'text',
-          content: pind.message,
+          content: ping.message,
           is_first_message: true,
-          created_at: pind.created_at,
+          created_at: ping.created_at,
         };
 
         set({
           matches: [...state.matches, newMatch],
           threads: [...state.threads, newThread],
           messages: [...state.messages, initialMessage],
-          pinds: state.pinds.filter(p => p.id !== pindId),
+          pings: state.pings.filter(p => p.id !== pingId),
         });
       },
 
-      dismissPind: (pindId) =>
+      dismissPing: (pingId) =>
         set((state) => ({
-          pinds: state.pinds.filter(p => p.id !== pindId),
+          pings: state.pings.filter(p => p.id !== pingId),
         })),
 
-      sendPind: (toUserId, message) => {
+      sendPing: (toUserId, message) => {
         const state = get();
-        const newPind: Pind = {
-          id: `pind-${Date.now()}`,
+        const newPing: Ping = {
+          id: `ping-${Date.now()}`,
           from_user_id: state.currentUserId,
           to_user_id: toUserId,
           message,
@@ -725,7 +725,7 @@ const useDatingStore = create<DatingStore>()(
         };
 
         set({
-          pinds: [...state.pinds, newPind],
+          pings: [...state.pings, newPing],
         });
       },
 
@@ -809,9 +809,9 @@ const useDatingStore = create<DatingStore>()(
         return state.likes.filter(l => !l.seen && l.to_user_id === state.currentUserId).length;
       },
 
-      getUnreadPindsCount: () => {
+      getUnreadPingsCount: () => {
         const state = get();
-        return state.pinds.filter(p => !p.read && p.to_user_id === state.currentUserId).length;
+        return state.pings.filter(p => !p.read && p.to_user_id === state.currentUserId).length;
       },
 
       // ===== GAME ACTIONS =====
@@ -2611,9 +2611,9 @@ const useDatingStore = create<DatingStore>()(
             ...m,
             media_url: undefined, // Don't persist media URLs
           })),
-        // Persist likes and pinds
+        // Persist likes and pings
         likes: state.likes.slice(-50),
-        pinds: state.pinds.slice(-50),
+        pings: state.pings.slice(-50),
       }),
     }
   )

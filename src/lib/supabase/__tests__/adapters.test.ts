@@ -16,7 +16,7 @@ import {
   transformMatch,
   transformChatThread,
   transformLike,
-  transformPind,
+  transformPing,
   isSupabaseProfile,
   isAppProfile,
   ensureAppProfile,
@@ -26,7 +26,7 @@ import {
   SupabaseMatch,
   SupabaseChatThread,
   SupabaseLike,
-  SupabasePind,
+  SupabasePing,
 } from '../adapters';
 
 describe('Utility Functions', () => {
@@ -453,20 +453,20 @@ describe('Like Adapter', () => {
   });
 });
 
-describe('Pind Adapter', () => {
-  it('should transform a pind', () => {
-    const supabasePind: SupabasePind = {
-      id: 'pind-1',
+describe('Ping Adapter', () => {
+  it('should transform a ping', () => {
+    const supabasePing: SupabasePing = {
+      id: 'ping-1',
       from_user_id: 'user-1',
       to_user_id: 'user-2',
       message: 'Hey there!',
       created_at: '2025-01-14T12:00:00Z',
       read: false,
     };
-    const appPind = transformPind(supabasePind);
+    const appPing = transformPing(supabasePing);
 
-    expect(appPind.id).toBe('pind-1');
-    expect(appPind.message).toBe('Hey there!');
-    expect(appPind.read).toBe(false);
+    expect(appPing.id).toBe('ping-1');
+    expect(appPing.message).toBe('Hey there!');
+    expect(appPing.read).toBe(false);
   });
 });

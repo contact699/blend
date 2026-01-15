@@ -153,7 +153,7 @@ This guide walks you through setting up your Supabase backend for the Blend ENM 
    - ✅ messages
    - ✅ chat_threads
    - ✅ likes
-   - ✅ pinds
+   - ✅ pings
    - ✅ events
    - ✅ trust_scores
    - ✅ date_reviews

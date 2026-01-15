@@ -5,7 +5,7 @@
  * - Messages (new messages in threads)
  * - Matches (new matches)
  * - Likes (new likes received)
- * - Pinds (new pinds received)
+ * - Pings (new pings received)
  */
 
 import { useEffect, useCallback, useRef } from 'react';
@@ -42,7 +42,7 @@ interface RealtimeLike {
   created_at: string;
 }
 
-interface RealtimePind {
+interface RealtimePing {
   id: string;
   from_user_id: string;
   to_user_id: string;
@@ -218,11 +218,11 @@ export function useRealtimeLikes() {
 }
 
 // ============================================================================
-// HOOK: useRealtimePinds
-// Subscribe to new pinds received
+// HOOK: useRealtimePings
+// Subscribe to new pings received
 // ============================================================================
 
-export function useRealtimePinds() {
+export function useRealtimePings() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -231,17 +231,17 @@ export function useRealtimePinds() {
     if (!user) return;
 
     const channel = supabase
-      .channel(`pinds:${user.id}`)
+      .channel(`pings:${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'pinds',
+          table: 'pings',
           filter: `to_user_id=eq.${user.id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['pinds-received'] });
+          queryClient.invalidateQueries({ queryKey: ['pings-received'] });
         }
       )
       .on(
@@ -249,11 +249,11 @@ export function useRealtimePinds() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'pinds',
+          table: 'pings',
           filter: `to_user_id=eq.${user.id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['pinds-received'] });
+          queryClient.invalidateQueries({ queryKey: ['pings-received'] });
         }
       )
       .subscribe();
@@ -328,7 +328,7 @@ export function useRealtimeEvents() {
 export function useRealtimeAll() {
   useRealtimeMatches();
   useRealtimeLikes();
-  useRealtimePinds();
+  useRealtimePings();
   useRealtimeEvents();
 }
 
@@ -347,8 +347,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.matches;
 -- Enable realtime for likes
 ALTER PUBLICATION supabase_realtime ADD TABLE public.likes;
 
--- Enable realtime for pinds
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pinds;
+-- Enable realtime for pings
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pings;
 
 -- Enable realtime for events
 ALTER PUBLICATION supabase_realtime ADD TABLE public.events;

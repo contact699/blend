@@ -26,7 +26,7 @@ const DatingDarkTheme = {
 
 // Inner component to use hooks inside QueryClientProvider
 function AppContent() {
-  // Subscribe to real-time updates for matches, likes, pinds, events
+  // Subscribe to real-time updates for matches, likes, pings, events
   useRealtimeAll();
 
   useEffect(() => {

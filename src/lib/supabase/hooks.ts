@@ -7,7 +7,7 @@ import {
   validateOrThrow,
   profileUpdateSchema,
   createMessageSchema,
-  createPindSchema,
+  createPingSchema,
   createReportSchema,
   blockUserSchema,
   uuidSchema,
@@ -553,7 +553,7 @@ export function useMarkMessagesRead() {
 }
 
 // ============================================================================
-// LIKES & PINDS HOOKS
+// LIKES & PINGS HOOKS
 // ============================================================================
 
 /**
@@ -588,9 +588,9 @@ export function useLikesReceived() {
 }
 
 /**
- * Hook to send a pind
+ * Hook to send a ping
  */
-export function useSendPind() {
+export function useSendPing() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
 
@@ -598,10 +598,10 @@ export function useSendPind() {
     mutationFn: async (input: { to_user_id: string; message: string }) => {
       if (!user) throw new Error('Not authenticated');
 
-      const validated = validateOrThrow(createPindSchema, input);
+      const validated = validateOrThrow(createPingSchema, input);
 
       const { data, error } = await supabase
-        .from('pinds')
+        .from('pings')
         .insert({
           from_user_id: user.id,
           to_user_id: validated.to_user_id,
@@ -614,25 +614,25 @@ export function useSendPind() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pinds'] });
+      queryClient.invalidateQueries({ queryKey: ['pings'] });
     },
   });
 }
 
 /**
- * Hook to get pinds received
+ * Hook to get pings received
  */
-export function usePindsReceived() {
+export function usePingsReceived() {
   const userQuery = useCurrentUser();
   const user = userQuery.data;
 
   return useQuery({
-    queryKey: ['pinds', 'received', user],
+    queryKey: ['pings', 'received', user],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from('pinds')
+        .from('pings')
         .select('*')
         .eq('to_user_id', user.id)
         .order('created_at', { ascending: false });
