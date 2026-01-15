@@ -26,7 +26,7 @@ import {
   Video,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCurrentUser, useThreadMessages, useSendMessage, supabase } from '@/lib/supabase';
+import { useCurrentUser, useThreadMessages, useSendMessage, supabase, useRealtimeMessages } from '@/lib/supabase';
 import { getSignedPhotoUrls } from '@/lib/supabase/photos';
 import { cn } from '@/lib/cn';
 import { FIRST_MESSAGE_PROMPTS } from '@/lib/static-data';
@@ -66,6 +66,9 @@ export default function ChatScreen() {
   const { data: currentUser } = useCurrentUser();
   const { data: messages, isLoading: messagesLoading } = useThreadMessages(threadId);
   const sendMessageMutation = useSendMessage();
+  
+  // Subscribe to real-time message updates
+  useRealtimeMessages(threadId);
 
   // Incoming call detection
   const { incomingCall, acceptCall, declineCall } = useIncomingCall(currentUser?.id || null);

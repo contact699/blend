@@ -107,3 +107,13 @@ export type {
 } from './adapters';
 
 export type { Database } from './types';
+
+// Realtime subscriptions - use these for live updates
+export {
+  useRealtimeMessages,
+  useRealtimeMatches,
+  useRealtimeLikes,
+  useRealtimePinds,
+  useRealtimeEvents,
+  useRealtimeAll,
+} from './realtime';

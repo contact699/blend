@@ -449,7 +449,8 @@ export function useThreadMessages(threadId: string | undefined) {
       return messageList;
     },
     enabled: !!threadId && !!user,
-    refetchInterval: 5000, // Poll for new messages
+    // Realtime subscriptions handle updates - no polling needed
+    // Use useRealtimeMessages(threadId) in your component for live updates
   });
 }
 
