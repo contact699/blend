@@ -45,6 +45,27 @@ CREATE TABLE IF NOT EXISTS public.events (
   cancellation_reason TEXT
 );
 
+-- ============================================================================
+-- EVENT_RSVPS TABLE (must be created BEFORE events RLS policies)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.event_rsvps (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'going' CHECK (status IN ('going', 'maybe', 'not_going', 'waitlist', 'pending_approval')),
+  message TEXT CHECK (message IS NULL OR length(message) <= 500),
+  waitlist_position INTEGER,
+  approved_by UUID REFERENCES public.users(id),
+  approved_at TIMESTAMPTZ,
+  checked_in_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(event_id, user_id)
+);
+
+-- ============================================================================
+-- RLS POLICIES FOR EVENTS
+-- ============================================================================
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
 -- Public events are visible to all authenticated users
@@ -72,23 +93,8 @@ CREATE POLICY "Hosts can delete own events" ON public.events
   FOR DELETE USING (auth.uid() = host_id);
 
 -- ============================================================================
--- EVENT_RSVPS TABLE
+-- RLS POLICIES FOR EVENT_RSVPS
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.event_rsvps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  status TEXT DEFAULT 'going' CHECK (status IN ('going', 'maybe', 'not_going', 'waitlist', 'pending_approval')),
-  message TEXT CHECK (message IS NULL OR length(message) <= 500),
-  waitlist_position INTEGER,
-  approved_by UUID REFERENCES public.users(id),
-  approved_at TIMESTAMPTZ,
-  checked_in_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(event_id, user_id)
-);
-
 ALTER TABLE public.event_rsvps ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view RSVPs for events they can see" ON public.event_rsvps;
