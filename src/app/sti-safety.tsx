@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Pressable, TextInput, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Pressable, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +16,26 @@ import {
   X,
 } from 'lucide-react-native';
 import { STITestRecord } from '@/lib/types';
+import { useMostRecentSTITest, useAddSTIRecord } from '@/lib/supabase';
+
+// Helper to map test names to database enum values
+function mapTestNameToType(testName: string): 'full_panel' | 'hiv' | 'syphilis' | 'chlamydia' | 'gonorrhea' | 'herpes' | 'hpv' | 'hepatitis_b' | 'hepatitis_c' | 'trich' | 'other' {
+  const mapping: Record<string, any> = {
+    'HIV': 'hiv',
+    'HSV-1': 'herpes',
+    'HSV-2': 'herpes',
+    'Herpes': 'herpes',
+    'Syphilis': 'syphilis',
+    'Chlamydia': 'chlamydia',
+    'Gonorrhea': 'gonorrhea',
+    'HPV': 'hpv',
+    'Hepatitis B': 'hepatitis_b',
+    'Hepatitis C': 'hepatitis_c',
+    'Trichomoniasis': 'trich',
+    'Full Panel': 'full_panel',
+  };
+  return mapping[testName] || 'other';
+}
 
 const COMMON_TESTS = [
   'HIV',
@@ -239,9 +259,26 @@ function AddTestModal({
 
 export default function STISafety() {
   const router = useRouter();
-  // TODO: Replace with useSTIRecord() hook from Supabase
-  const [record, setRecord] = useState<STITestRecord | null>(null);
+  const { data: record, isLoading } = useMostRecentSTITest();
+  const addSTIRecord = useAddSTIRecord();
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-black">
+        <View className="px-6 py-4 flex-row items-center border-b border-zinc-800">
+          <Pressable onPress={() => router.back()} className="mr-4">
+            <ChevronLeft size={24} color="white" />
+          </Pressable>
+          <Text className="text-white font-bold text-lg">STI Safety</Text>
+        </View>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#c084fc" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // If no record exists, show empty state encouraging user to add their first test
   if (!record) {
@@ -269,13 +306,20 @@ export default function STISafety() {
         <AddTestModal
           visible={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSave={(newRecord) => {
-            setRecord({
-              id: `sti-${Date.now()}`,
-              user_id: 'current-user',
-              ...newRecord,
-            });
-            setShowAddModal(false);
+          onSave={async (newRecord) => {
+            try {
+              await addSTIRecord.mutateAsync({
+                test_date: newRecord.test_date,
+                test_type: mapTestNameToType(newRecord.test_type),
+                result: 'negative', // Default to negative, user can update later
+                notes: newRecord.notes,
+                shared_with_matches: newRecord.share_with_matches ?? false,
+              });
+              setShowAddModal(false);
+            } catch (error) {
+              console.error('[STI Safety] Error adding record:', error);
+              Alert.alert('Error', 'Failed to save test record. Please try again.');
+            }
           }}
         />
       </SafeAreaView>
@@ -297,12 +341,20 @@ export default function STISafety() {
     return 'Up to date';
   };
 
-  const handleSaveNewRecord = (newRecord: Omit<STITestRecord, 'id' | 'user_id'>) => {
-    setRecord({
-      id: `sti-${Date.now()}`,
-      user_id: 'user-1',
-      ...newRecord,
-    });
+  const handleSaveNewRecord = async (newRecord: Omit<STITestRecord, 'id' | 'user_id'>) => {
+    try {
+      await addSTIRecord.mutateAsync({
+        test_date: newRecord.test_date,
+        test_type: mapTestNameToType(newRecord.test_type),
+        result: 'negative', // Default to negative, user can update later
+        notes: newRecord.notes,
+        shared_with_matches: newRecord.share_with_matches ?? false,
+      });
+      setShowAddModal(false);
+    } catch (error) {
+      console.error('[STI Safety] Error adding record:', error);
+      Alert.alert('Error', 'Failed to save test record. Please try again.');
+    }
   };
 
   return (
