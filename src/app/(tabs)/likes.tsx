@@ -471,6 +471,9 @@ export default function LikesScreen() {
                     }
                   }}
                   className="rounded-xl overflow-hidden mb-3"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Send message to ${matchedProfile?.display_name ?? 'match'}`}
+                  accessibilityHint="Start a conversation with your new match"
                 >
                   <LinearGradient
                     colors={['#9333ea', '#db2777']}
@@ -485,6 +488,9 @@ export default function LikesScreen() {
                 <Pressable
                   onPress={() => setShowMatchModal(false)}
                   className="bg-zinc-800 py-4 rounded-xl items-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Keep browsing"
+                  accessibilityHint="Close this dialog and continue browsing likes"
                 >
                   <Text className="text-gray-300 font-medium">Keep Browsing</Text>
                 </Pressable>

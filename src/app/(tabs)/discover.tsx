@@ -240,6 +240,9 @@ export default function DiscoverScreen() {
                   refetch();
                 }}
                 className="rounded-xl overflow-hidden"
+                accessibilityRole="button"
+                accessibilityLabel="Refresh profiles"
+                accessibilityHint="Load new profiles and reset skipped profiles"
               >
                 <LinearGradient
                   colors={['#9333ea', '#db2777']}
@@ -284,12 +287,18 @@ export default function DiscoverScreen() {
                 <Pressable
                   onPress={() => router.push('/search')}
                   className="w-10 h-10 bg-zinc-800 rounded-full items-center justify-center border border-zinc-700"
+                  accessibilityRole="button"
+                  accessibilityLabel="Open search"
+                  accessibilityHint="Search for profiles with advanced filters"
                 >
                   <Search size={18} color="#c084fc" />
                 </Pressable>
                 <Pressable
                   onPress={() => setShowFilterModal(true)}
                   className="flex-row items-center bg-purple-500/20 px-3 py-1.5 rounded-full border border-purple-500/30"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Location filter: ${getFilterLabel()}`}
+                  accessibilityHint="Change location filter to see profiles from different areas"
                 >
                   <MapPin size={14} color="#c084fc" />
                   <Text className="text-purple-300 text-sm font-medium ml-1">
@@ -490,6 +499,9 @@ export default function DiscoverScreen() {
             <Pressable
               onPress={handlePass}
               className="w-16 h-16 bg-zinc-800/80 rounded-full items-center justify-center active:bg-zinc-700 border border-zinc-700/50"
+              accessibilityRole="button"
+              accessibilityLabel={`Pass on ${currentProfileToShow.display_name}`}
+              accessibilityHint="Skip this profile and see the next one"
             >
               <X size={28} color="#9ca3af" />
             </Pressable>
@@ -498,6 +510,10 @@ export default function DiscoverScreen() {
               onPress={handleLike}
               disabled={likeMutation.isPending}
               className="w-20 h-20 rounded-full items-center justify-center ml-6 overflow-hidden"
+              accessibilityRole="button"
+              accessibilityLabel={`Like ${currentProfileToShow.display_name}`}
+              accessibilityHint="Send a like to this profile"
+              accessibilityState={{ disabled: likeMutation.isPending }}
             >
               <LinearGradient
                 colors={['#9333ea', '#db2777']}
@@ -587,6 +603,10 @@ function FilterModal({
                       ? 'bg-purple-500/20 border-purple-500'
                       : 'bg-zinc-800/60 border-zinc-700/50'
                   )}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Filter: Nearby"
+                  accessibilityHint="Show profiles from Bay Area only"
+                  accessibilityState={{ checked: locationFilter === 'nearby', selected: locationFilter === 'nearby' }}
                 >
                   <View className="w-10 h-10 bg-purple-500/20 rounded-full items-center justify-center">
                     <MapPin size={20} color="#c084fc" />
