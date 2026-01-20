@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useLikesReceived, useCurrentUser, supabase } from '@/lib/supabase';
 import { getSignedPhotoUrls } from '@/lib/supabase/photos';
 import { cn } from '@/lib/cn';
+import { haptics } from '@/lib/haptics';
 
 interface LikeWithProfile {
   id: string;
@@ -151,7 +152,7 @@ export default function LikesScreen() {
       return { success: true, profile: like.profile, threadId };
     },
     onSuccess: (data) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.match();
       queryClient.invalidateQueries({ queryKey: ['likes'] });
       queryClient.invalidateQueries({ queryKey: ['matches'] });
       queryClient.invalidateQueries({ queryKey: ['chat-threads'] });

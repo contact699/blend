@@ -15,6 +15,7 @@ import { CompatibilityPill } from '@/components/CompatibilityBadge';
 import { MatchHighlights } from '@/components/MatchInsights';
 import { quickCompatibilityScore } from '@/lib/matching/compatibility-engine';
 import { Profile } from '@/lib/types';
+import { haptics } from '@/lib/haptics';
 
 type LocationFilter = 'nearby' | 'all' | 'virtual' | string;
 
@@ -139,7 +140,7 @@ export default function DiscoverScreen() {
       response_style: 'relaxed',
     });
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.like();
     likeMutation.mutate(currentProfileToShow.user_id);
     setSkippedProfiles((prev) => [...prev, currentProfileToShow.user_id]);
   };
@@ -159,12 +160,12 @@ export default function DiscoverScreen() {
       response_style: 'relaxed',
     });
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.pass();
     setSkippedProfiles((prev) => [...prev, currentProfileToShow.user_id]);
   };
 
   const toggleSmartMatching = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.tap();
     setSmartMatchingEnabled(!smartMatchingEnabled);
   };
 

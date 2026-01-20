@@ -525,6 +525,40 @@ export function useSendMessage() {
 
       return data as Message;
     },
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['messages', variables.thread_id] });
+
+      // Snapshot the previous value
+      const previousMessages = queryClient.getQueryData(['messages', variables.thread_id]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(['messages', variables.thread_id], (old: Message[] | undefined) => {
+        const optimisticMessage: Message = {
+          id: `temp-${Date.now()}`,
+          thread_id: variables.thread_id,
+          sender_id: user!.id,
+          message_type: variables.message_type || 'text',
+          content: variables.content,
+          is_first_message: variables.is_first_message || false,
+          created_at: new Date().toISOString(),
+          read_at: null,
+          viewed_at: null,
+          is_expired: false,
+        };
+
+        return old ? [...old, optimisticMessage] : [optimisticMessage];
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousMessages };
+    },
+    onError: (_err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousMessages) {
+        queryClient.setQueryData(['messages', variables.thread_id], context.previousMessages);
+      }
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['messages', data.thread_id] });
       queryClient.invalidateQueries({ queryKey: ['matches'] });
