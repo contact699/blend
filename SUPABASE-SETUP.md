@@ -35,7 +35,7 @@ This guide walks you through setting up your Supabase backend for the Blend ENM 
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your-long-key-here
    ```
 
-   **OR** use the **ENV tab** in Vibecode App to update these values.
+   **Note:** Make sure to restart your development server after updating `.env` file.
 
 ---
 

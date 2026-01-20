@@ -3,7 +3,7 @@
 > **Project:** Blend - Dating app for ethically non-monogamous (ENM) individuals and couples
 > **Tech Stack:** Expo SDK 53, React Native 0.79.6, TypeScript (strict), Supabase
 > **Package Manager:** Bun (NOT npm/yarn)
-> **Environment:** Vibecode (managed git, dev server on port 8081)
+> **Development:** Standard Expo development workflow
 
 ---
 
@@ -120,7 +120,7 @@
 ├── bun.lock                     # Lockfile (checked in)
 ├── tsconfig.json                # TypeScript config (strict mode, path alias: @/*)
 ├── babel.config.js              # NativeWind, module resolver
-├── metro.config.js              # NativeWind, Vibecode, SVG support
+├── metro.config.js              # NativeWind, SVG support
 ├── tailwind.config.js           # Custom font sizes (xs-9xl), dark mode
 ├── global.css                   # Global Tailwind directives
 ├── index.ts                     # Entry point
@@ -226,37 +226,29 @@
 
 ---
 
-## 🌐 Vibecode Environment
+## 🌐 Development Environment
 
 <environment>
-  **What is Vibecode?**
-  Vibecode is a managed development environment for mobile apps.
-
-  **Key Constraints:**
-  - You are in Vibecode. The system manages git and the dev server (port 8081).
-  - **DO NOT:** manage git, touch the dev server, or check its state
-  - The user views the app through **Vibecode App** (not a physical device)
-  - The user **cannot see the code or interact with the terminal**
-  - Do not tell the user to do anything with the code or terminal
+  **Development Setup:**
+  - Standard Expo development workflow
+  - Dev server runs on port 8081 by default
+  - Use Expo Go app or custom dev client to preview
+  - Full terminal and code access for the developer
 
   **Logging:**
-  - You can see logs in the `expo.log` file
-  - Check logs when debugging runtime issues
+  - Check Metro bundler output for runtime errors
+  - Use `console.log()` for debugging
+  - Expo DevTools for performance monitoring
 
-  **User-Accessible Tabs in Vibecode App:**
-  - **ENV tab** - Environment variables (Supabase keys, API keys)
-  - **API tab** - Configure APIs (OpenAI, Anthropic, Grok, ElevenLabs, etc.)
-  - **LOGS tab** - View runtime logs
-  - **IMAGES tab** - Generate and upload images
-
-  **Communication:**
-  - The user is likely **non-technical** — communicate clearly
-  - If the user's request is vague or ambitious, **scope down to specific functionality**
-  - **Do everything for them** — don't ask them to run commands
+  **Environment Variables:**
+  - Stored in `.env` file (not checked into git)
+  - Use `.env.example` as template
+  - All public variables must be prefixed with `EXPO_PUBLIC_`
 
   **Images:**
   - Use URLs from **unsplash.com** for placeholder images
-  - Tell user they can use **IMAGES tab** to generate/upload custom images
+  - Store user-uploaded images in Supabase Storage
+  - Use signed URLs for secure photo access
 </environment>
 
 ---
@@ -802,15 +794,28 @@
 ## 📱 App Store & Submission
 
 <appstore>
-  **Cannot assist with:**
-  - App Store submission processes
-  - Google Play submission
-  - EAS CLI commands
-  - app.json configuration
-  - eas.json configuration
+  **App Store Submission:**
+  Use Expo Application Services (EAS) for building and submitting:
 
-  **For submission help:**
-  Click **"Share"** on the top right corner in Vibecode App → Select **"Submit to App Store"**
+  ```bash
+  # Configure EAS
+  eas build:configure
+
+  # Build for iOS
+  eas build --platform ios
+
+  # Build for Android
+  eas build --platform android
+
+  # Submit to stores
+  eas submit --platform ios
+  eas submit --platform android
+  ```
+
+  **Resources:**
+  - [EAS Build Documentation](https://docs.expo.dev/build/introduction/)
+  - [App Store Guidelines](https://developer.apple.com/app-store/review/guidelines/)
+  - [Google Play Guidelines](https://play.google.com/about/developer-content-policy/)
 </appstore>
 
 ---
@@ -853,14 +858,15 @@
   - Check `expo.log` for errors
 
   **Debugging:**
-  1. Check `expo.log` file
-  2. Use LOGS tab in Vibecode App
-  3. Add console.log statements (visible in logs)
-  4. Use React DevTools (if available)
+  1. Check Metro bundler terminal output
+  2. View React Native debugger logs
+  3. Add console.log statements (visible in terminal)
+  4. Use React DevTools for component inspection
+  5. Use Expo DevTools for network/performance monitoring
 
   **Environment Variables:**
-  - Edit via ENV tab in Vibecode App
-  - Or edit `.env` file directly
+  - Edit `.env` file directly (not checked into git)
+  - Use `.env.example` as template for required variables
   - Prefix with `EXPO_PUBLIC_` for client-side access
 </workflows>
 
@@ -902,9 +908,9 @@ cat expo.log
 2. **Privacy-First:** User safety and data protection are paramount
 3. **ENM-Aware:** Respect diverse relationship styles and configurations
 4. **TypeScript Strict:** All types must be explicit
-5. **Vibecode Constraints:** Never manage git or dev server
-6. **User-Friendly:** Communicate clearly with non-technical users
-7. **Do Everything:** Don't ask users to run commands or edit code
+5. **Standard Workflow:** Use standard Expo development practices
+6. **User-Friendly:** Write clean, maintainable code
+7. **Best Practices:** Follow React Native and Expo conventions
 8. **Performance:** Use FlashList, optimize re-renders, lazy load
 9. **Accessibility:** Support screen readers, high contrast, large text
 10. **Security:** RLS, UUIDs, signed URLs, EXIF stripping
@@ -921,9 +927,9 @@ When starting a new task:
 - [ ] Review existing types in `src/lib/types.ts`
 - [ ] Check for existing components in `src/components/`
 - [ ] Use TypeScript strict mode (explicit types)
-- [ ] Test in Vibecode App (not physical device)
-- [ ] Check `expo.log` for errors
-- [ ] Communicate clearly with non-technical user
+- [ ] Test in Expo Go or custom dev client
+- [ ] Check Metro bundler output for errors
+- [ ] Verify changes work on both iOS and Android
 - [ ] Scope down if request is too broad
 
 ---

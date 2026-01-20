@@ -15,7 +15,7 @@ All tables have RLS enabled with policies that ensure:
 **To set up:** Run the SQL in `src/lib/supabase/schema.sql` in your Supabase SQL Editor.
 
 ### Required Environment Variables
-Add these to your ENV tab in Vibecode:
+Add these to your `.env` file:
 ```
 EXPO_PUBLIC_SUPABASE_URL=your-supabase-url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
