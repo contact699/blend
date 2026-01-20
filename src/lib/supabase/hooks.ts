@@ -960,6 +960,162 @@ export function useRemovePartnerLink() {
 }
 
 // ============================================================================
+// STI RECORDS HOOKS
+// ============================================================================
+
+export interface STIRecord {
+  id: string;
+  profile_id: string;
+  test_date: string;
+  test_type: 'full_panel' | 'hiv' | 'syphilis' | 'chlamydia' | 'gonorrhea' | 'herpes' | 'hpv' | 'hepatitis_b' | 'hepatitis_c' | 'trich' | 'other';
+  result: 'negative' | 'positive' | 'inconclusive' | 'pending';
+  notes?: string;
+  shared_with_matches: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Hook to get user's STI records
+ */
+export function useSTIRecords() {
+  const { data: profile } = useCurrentProfile();
+
+  return useQuery({
+    queryKey: ['sti-records', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+
+      const { data, error } = await supabase
+        .from('sti_records')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .order('test_date', { ascending: false });
+
+      if (error) {
+        console.error('[STI] Error fetching records:', error);
+        return [];
+      }
+
+      return (data ?? []) as STIRecord[];
+    },
+    enabled: !!profile?.id,
+  });
+}
+
+/**
+ * Hook to get most recent STI test
+ */
+export function useMostRecentSTITest() {
+  const { data: profile } = useCurrentProfile();
+
+  return useQuery({
+    queryKey: ['sti-records', 'recent', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return null;
+
+      const { data, error } = await supabase
+        .from('sti_records')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .order('test_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[STI] Error fetching recent test:', error);
+        return null;
+      }
+
+      return data as STIRecord | null;
+    },
+    enabled: !!profile?.id,
+  });
+}
+
+/**
+ * Hook to add STI record
+ */
+export function useAddSTIRecord() {
+  const queryClient = useQueryClient();
+  const { data: profile } = useCurrentProfile();
+
+  return useMutation({
+    mutationFn: async (input: Omit<STIRecord, 'id' | 'profile_id' | 'created_at' | 'updated_at'>) => {
+      if (!profile?.id) throw new Error('No profile');
+
+      const { data, error } = await supabase
+        .from('sti_records')
+        .insert({
+          profile_id: profile.id,
+          test_date: input.test_date,
+          test_type: input.test_type,
+          result: input.result,
+          notes: input.notes ?? null,
+          shared_with_matches: input.shared_with_matches,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as STIRecord;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sti-records'] });
+    },
+  });
+}
+
+/**
+ * Hook to update STI record
+ */
+export function useUpdateSTIRecord() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ recordId, updates }: {
+      recordId: string;
+      updates: Partial<Omit<STIRecord, 'id' | 'profile_id' | 'created_at' | 'updated_at'>>
+    }) => {
+      const { data, error } = await supabase
+        .from('sti_records')
+        .update(updates)
+        .eq('id', recordId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as STIRecord;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sti-records'] });
+    },
+  });
+}
+
+/**
+ * Hook to delete STI record
+ */
+export function useDeleteSTIRecord() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (recordId: string) => {
+      const { error } = await supabase
+        .from('sti_records')
+        .delete()
+        .eq('id', recordId);
+
+      if (error) throw error;
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sti-records'] });
+    },
+  });
+}
+
+// ============================================================================
 // EVENTS HOOKS
 // ============================================================================
 

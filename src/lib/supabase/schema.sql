@@ -194,33 +194,54 @@ CREATE POLICY "Users can manage own prompt responses" ON public.prompt_responses
   );
 
 -- ============================================================================
--- LINKED_PARTNERS TABLE
+-- PARTNER_LINKS TABLE (Partner Linking & Invitations)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.linked_partners (
+CREATE TABLE IF NOT EXISTS public.partner_links (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  name TEXT NOT NULL CHECK (length(name) >= 1 AND length(name) <= 30),
-  age INTEGER NOT NULL CHECK (age >= 18 AND age <= 120),
-  photo_storage_path TEXT,
+  invited_email TEXT NOT NULL,
+  linked_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  relationship_type TEXT NOT NULL CHECK (relationship_type IN ('anchor', 'nesting_partner', 'partner', 'dating', 'comet', 'meta', 'fwb')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'declined')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(profile_id)
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE public.linked_partners ENABLE ROW LEVEL SECURITY;
+-- Create index for efficient queries
+CREATE INDEX IF NOT EXISTS idx_partner_links_profile_id ON public.partner_links(profile_id);
+CREATE INDEX IF NOT EXISTS idx_partner_links_invited_email ON public.partner_links(invited_email);
+CREATE INDEX IF NOT EXISTS idx_partner_links_linked_user_id ON public.partner_links(linked_user_id);
 
-DROP POLICY IF EXISTS "Users can view linked partners" ON public.linked_partners;
-CREATE POLICY "Users can view linked partners" ON public.linked_partners
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = linked_partners.profile_id
-    )
+ALTER TABLE public.partner_links ENABLE ROW LEVEL SECURITY;
+
+-- Users can view partner links for any profile (to see partner networks)
+DROP POLICY IF EXISTS "Users can view partner links" ON public.partner_links;
+CREATE POLICY "Users can view partner links" ON public.partner_links
+  FOR SELECT USING (true);
+
+-- Users can create partner links for their own profile
+DROP POLICY IF EXISTS "Users can create own partner links" ON public.partner_links;
+CREATE POLICY "Users can create own partner links" ON public.partner_links
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = partner_links.profile_id AND user_id = auth.uid())
   );
 
-DROP POLICY IF EXISTS "Users can manage own linked partner" ON public.linked_partners;
-CREATE POLICY "Users can manage own linked partner" ON public.linked_partners
-  FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = linked_partners.profile_id AND user_id = auth.uid())
+-- Users can update partner links where they're the requester OR the invited user
+DROP POLICY IF EXISTS "Users can update partner links" ON public.partner_links;
+CREATE POLICY "Users can update partner links" ON public.partner_links
+  FOR UPDATE USING (
+    -- Either the requester
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = partner_links.profile_id AND user_id = auth.uid())
+    OR
+    -- Or the invited user (to accept/decline)
+    linked_user_id = auth.uid()
+  );
+
+-- Users can delete their own partner links
+DROP POLICY IF EXISTS "Users can delete own partner links" ON public.partner_links;
+CREATE POLICY "Users can delete own partner links" ON public.partner_links
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = partner_links.profile_id AND user_id = auth.uid())
   );
 
 -- ============================================================================
@@ -603,6 +624,55 @@ END;
 $$;
 
 -- ============================================================================
+-- STI_RECORDS TABLE (Sexual Health Tracking)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.sti_records (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  test_date DATE NOT NULL,
+  test_type TEXT NOT NULL CHECK (test_type IN ('full_panel', 'hiv', 'syphilis', 'chlamydia', 'gonorrhea', 'herpes', 'hpv', 'hepatitis_b', 'hepatitis_c', 'trich', 'other')),
+  result TEXT NOT NULL CHECK (result IN ('negative', 'positive', 'inconclusive', 'pending')),
+  notes TEXT,
+  shared_with_matches BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create index for efficient queries
+CREATE INDEX IF NOT EXISTS idx_sti_records_profile_id ON public.sti_records(profile_id);
+CREATE INDEX IF NOT EXISTS idx_sti_records_test_date ON public.sti_records(test_date DESC);
+
+ALTER TABLE public.sti_records ENABLE ROW LEVEL SECURITY;
+
+-- Users can only view their own STI records
+DROP POLICY IF EXISTS "Users can view own STI records" ON public.sti_records;
+CREATE POLICY "Users can view own STI records" ON public.sti_records
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = sti_records.profile_id AND user_id = auth.uid())
+  );
+
+-- Users can only insert their own STI records
+DROP POLICY IF EXISTS "Users can insert own STI records" ON public.sti_records;
+CREATE POLICY "Users can insert own STI records" ON public.sti_records
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = sti_records.profile_id AND user_id = auth.uid())
+  );
+
+-- Users can only update their own STI records
+DROP POLICY IF EXISTS "Users can update own STI records" ON public.sti_records;
+CREATE POLICY "Users can update own STI records" ON public.sti_records
+  FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = sti_records.profile_id AND user_id = auth.uid())
+  );
+
+-- Users can only delete their own STI records
+DROP POLICY IF EXISTS "Users can delete own STI records" ON public.sti_records;
+CREATE POLICY "Users can delete own STI records" ON public.sti_records
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = sti_records.profile_id AND user_id = auth.uid())
+  );
+
+-- ============================================================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles(user_id);
@@ -645,4 +715,14 @@ CREATE TRIGGER update_matches_updated_at
 DROP TRIGGER IF EXISTS update_prompt_responses_updated_at ON public.prompt_responses;
 CREATE TRIGGER update_prompt_responses_updated_at
   BEFORE UPDATE ON public.prompt_responses
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_partner_links_updated_at ON public.partner_links;
+CREATE TRIGGER update_partner_links_updated_at
+  BEFORE UPDATE ON public.partner_links
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_sti_records_updated_at ON public.sti_records;
+CREATE TRIGGER update_sti_records_updated_at
+  BEFORE UPDATE ON public.sti_records
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

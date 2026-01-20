@@ -22,7 +22,12 @@ import PolyculeMap from '@/components/PolyculeMap';
 import DateCalendar from '@/components/DateCalendar';
 import AgreementBuilder from '@/components/AgreementBuilder';
 import MeetThePartners from '@/components/MeetThePartners';
-import { supabase, useCurrentProfile, useCurrentUser } from '@/lib/supabase';
+import {
+  useCurrentProfile,
+  useCurrentUser,
+  usePartnerLinks,
+  useMostRecentSTITest
+} from '@/lib/supabase';
 import { ScheduledDate, RelationshipAgreement, Polycule, PolyculeConnection, PartnerProfile } from '@/lib/types';
 
 type FeatureSection = 'map' | 'calendar' | 'agreement' | 'partners' | null;
@@ -80,28 +85,13 @@ export default function MyRelationships() {
   const [dates, setDates] = useState<ScheduledDate[]>([]); // Will be fetched from Supabase
   const [agreement, setAgreement] = useState<RelationshipAgreement | null>(null);
 
-  // Fetch linked partners from database
-  const { data: linkedPartners } = useQuery({
-    queryKey: ['linked-partners', profile?.id],
-    queryFn: async () => {
-      if (!profile?.id) return [];
+  // Fetch linked partners from database using proper hook
+  const { data: partnerLinks = [] } = usePartnerLinks();
 
-      const { data, error } = await supabase
-        .from('linked_partners')
-        .select('*')
-        .eq('profile_id', profile.id);
+  // Fetch most recent STI test
+  const { data: recentSTITest } = useMostRecentSTITest();
 
-      if (error) {
-        console.error('[Relationships] Error fetching linked partners:', error);
-        return [];
-      }
-
-      return data ?? [];
-    },
-    enabled: !!profile?.id,
-  });
-
-  // Build polycule from linked partners
+  // Build polycule from partner links
   const polycule: Polycule = {
     id: 'user-polycule',
     user_id: currentUser?.id ?? 'me',
@@ -115,21 +105,23 @@ export default function MyRelationships() {
         photo: undefined,
         relationship_type: 'anchor',
         connection_strength: 'primary',
-        connected_to: linkedPartners?.map((p) => p.id) ?? [],
+        connected_to: partnerLinks.map((p) => p.id),
         is_on_blend: true,
         link_status: 'confirmed',
       },
-      // Linked partners
-      ...(linkedPartners ?? []).map((partner): PolyculeConnection => ({
-        id: partner.id,
-        name: partner.name,
-        photo: partner.photo_storage_path ?? undefined,
-        relationship_type: 'partner',
-        connection_strength: 'primary',
-        connected_to: ['me'],
-        is_on_blend: false,
-        link_status: 'confirmed',
-      })),
+      // Linked partners (confirmed only)
+      ...partnerLinks
+        .filter((link) => link.status === 'confirmed')
+        .map((link): PolyculeConnection => ({
+          id: link.id,
+          name: link.linked_profile?.display_name ?? 'Partner',
+          photo: link.linked_profile?.photos?.[0]?.signedUrl,
+          relationship_type: link.relationship_type as any,
+          connection_strength: 'primary',
+          connected_to: ['me'],
+          is_on_blend: !!link.linked_user_id,
+          link_status: link.status as any,
+        })),
     ],
     updated_at: new Date().toISOString(),
   };
@@ -158,22 +150,25 @@ export default function MyRelationships() {
     setShowAgreementBuilder(false);
   };
 
-  // Build partner profiles from linked partners for MeetThePartners component
-  const partnerProfiles: PartnerProfile[] = (linkedPartners ?? []).map((partner) => ({
-    id: partner.id,
-    name: partner.name,
-    age: 0, // Will be populated when linked partner syncs with Blend profile
-    photo: partner.photo_storage_path ?? undefined,
-    relationship_type: 'Partner',
-    relationship_duration: 'Recently linked',
-    bio: '',
-    involvement_level: 'aware_only' as const,
-    can_message: false,
-  }));
+  // Build partner profiles from partner links for MeetThePartners component
+  const partnerProfiles: PartnerProfile[] = partnerLinks
+    .filter((link) => link.status === 'confirmed')
+    .map((link) => ({
+      id: link.id,
+      name: link.linked_profile?.display_name ?? 'Partner',
+      age: link.linked_profile?.age ?? 0,
+      photo: link.linked_profile?.photos?.[0]?.signedUrl,
+      relationship_type: link.relationship_type as string,
+      relationship_duration: 'Recently linked',
+      bio: link.linked_profile?.bio ?? '',
+      involvement_level: 'aware_only' as const,
+      can_message: !!link.linked_user_id,
+    }));
 
-  // TODO: Fetch STI record from Supabase with useQuery
-  // For now, show placeholder if no data
-  const daysSinceTest = null; // Will be: stiRecord ? Math.floor((Date.now() - new Date(stiRecord.test_date).getTime()) / (1000 * 60 * 60 * 24)) : null;
+  // Calculate days since most recent STI test
+  const daysSinceTest = recentSTITest
+    ? Math.floor((Date.now() - new Date(recentSTITest.test_date).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
   return (
     <View className="flex-1 bg-black">
