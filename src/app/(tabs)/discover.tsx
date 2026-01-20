@@ -11,10 +11,12 @@ import { useDiscoverProfiles, useCurrentUser } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/cn';
 import useDatingStore from '@/lib/state/dating-store';
+import useSubscriptionStore from '@/lib/state/subscription-store';
 import { CompatibilityPill } from '@/components/CompatibilityBadge';
 import { MatchHighlights } from '@/components/MatchInsights';
 import { quickCompatibilityScore } from '@/lib/matching/compatibility-engine';
 import { Profile } from '@/lib/types';
+import PaywallModal from '@/components/PaywallModal';
 import { haptics } from '@/lib/haptics';
 
 type LocationFilter = 'nearby' | 'all' | 'virtual' | string;
@@ -28,6 +30,7 @@ export default function DiscoverScreen() {
   const [skippedProfiles, setSkippedProfiles] = useState<string[]>([]);
   const [locationFilter, setLocationFilter] = useState<LocationFilter>('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   // Smart matching state from store
   const smartMatchingEnabled = useDatingStore((s) => s.smartMatchingEnabled);
@@ -36,6 +39,11 @@ export default function DiscoverScreen() {
   const trackProfileView = useDatingStore((s) => s.trackProfileView);
   const cacheCompatibilityScore = useDatingStore((s) => s.cacheCompatibilityScore);
   const getCachedCompatibilityScore = useDatingStore((s) => s.getCachedCompatibilityScore);
+
+  // Subscription state
+  const canUseLike = useSubscriptionStore((s) => s.canUseLike);
+  const incrementLikesUsed = useSubscriptionStore((s) => s.incrementLikesUsed);
+  const remainingLikes = useSubscriptionStore((s) => s.getRemainingLikes());
 
   // Track view start time
   const viewStartTime = useRef<number>(Date.now());
@@ -128,6 +136,13 @@ export default function DiscoverScreen() {
   const handleLike = () => {
     if (!currentProfileToShow) return;
 
+    // Check if user can like (subscription limits)
+    if (!canUseLike()) {
+      haptics.warning();
+      setShowPaywall(true);
+      return;
+    }
+
     // Track the view with action
     const dwellTime = Date.now() - viewStartTime.current;
     trackProfileView(currentProfileToShow.user_id, dwellTime, 'like', {
@@ -141,6 +156,7 @@ export default function DiscoverScreen() {
     });
 
     haptics.like();
+    incrementLikesUsed();
     likeMutation.mutate(currentProfileToShow.user_id);
     setSkippedProfiles((prev) => [...prev, currentProfileToShow.user_id]);
   };
@@ -539,6 +555,13 @@ export default function DiscoverScreen() {
           locationFilter={locationFilter}
           setLocationFilter={setLocationFilter}
           cities={cities}
+        />
+
+        {/* Paywall Modal */}
+        <PaywallModal
+          visible={showPaywall}
+          onClose={() => setShowPaywall(false)}
+          reason="likes_limit"
         />
       </LinearGradient>
     </View>
