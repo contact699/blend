@@ -74,12 +74,23 @@ export default function EditProfileScreen() {
       try {
         const uploadedPhoto = await uploadPhotoMutation.mutateAsync(result.assets[0].uri);
         console.log('[EditProfile] Photo uploaded:', uploadedPhoto);
-        // Add the signed URL to local state for display
+
+        // Temporarily show local URI until profile refetches
+        // The profile query will be invalidated and refetch with signed URLs
         setPhotos([...photos, result.assets[0].uri]);
         Alert.alert('Success', 'Photo uploaded successfully!');
       } catch (error) {
         console.error('[EditProfile] Upload error:', error);
-        Alert.alert('Upload failed', error instanceof Error ? error.message : 'Could not upload photo');
+        const errorMessage = error instanceof Error ? error.message : 'Could not upload photo';
+
+        // More specific error messages
+        if (errorMessage.includes('bucket')) {
+          Alert.alert('Upload failed', 'Photo storage is not configured yet. Please contact support.');
+        } else if (errorMessage.includes('permission')) {
+          Alert.alert('Upload failed', 'You don\'t have permission to upload photos.');
+        } else {
+          Alert.alert('Upload failed', errorMessage);
+        }
       } finally {
         setIsUploading(false);
       }

@@ -36,6 +36,7 @@ export default function LikesScreen() {
 
   // State for match success modal
   const [matchedProfile, setMatchedProfile] = useState<LikeWithProfile['profile'] | null>(null);
+  const [matchedThreadId, setMatchedThreadId] = useState<string | null>(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
 
   // Fetch profiles for all likes
@@ -125,6 +126,7 @@ export default function LikesScreen() {
       console.log('[Likes] Match created:', matchData);
 
       // Create a chat thread for the match
+      let threadId = null;
       if (matchData) {
         const { data: threadData, error: threadError } = await supabase.from('chat_threads').insert({
           match_id: matchData.id,
@@ -136,6 +138,7 @@ export default function LikesScreen() {
           // Don't throw - match was still created
         } else {
           console.log('[Likes] Chat thread created:', threadData);
+          threadId = threadData.id;
         }
       }
 
@@ -145,7 +148,7 @@ export default function LikesScreen() {
       // Delete the original like since it's now a match
       await supabase.from('likes').delete().eq('id', like.id);
 
-      return { success: true, profile: like.profile };
+      return { success: true, profile: like.profile, threadId };
     },
     onSuccess: (data) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -156,6 +159,7 @@ export default function LikesScreen() {
       // Show match success modal
       if (data?.profile) {
         setMatchedProfile(data.profile);
+        setMatchedThreadId(data.threadId);
         setShowMatchModal(true);
       }
     },
@@ -458,8 +462,13 @@ export default function LikesScreen() {
                 <Pressable
                   onPress={() => {
                     setShowMatchModal(false);
-                    // Navigate to inbox tab (messages)
-                    router.push('/(tabs)/inbox');
+                    // Navigate directly to the chat thread
+                    if (matchedThreadId) {
+                      router.push(`/chat/${matchedThreadId}`);
+                    } else {
+                      // Fallback to inbox if no thread ID
+                      router.push('/(tabs)/inbox');
+                    }
                   }}
                   className="rounded-xl overflow-hidden mb-3"
                 >

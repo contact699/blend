@@ -85,13 +85,20 @@ export async function registerForPushNotifications(): Promise<string | null> {
   // Get the Expo push token
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+    if (!projectId) {
+      console.log('[Push] No EAS project ID configured, skipping push token registration');
+      return null;
+    }
+
     const token = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
-    
+
+    console.log('[Push] Successfully obtained Expo push token');
     return token.data;
   } catch (error) {
-    console.error('Failed to get push token:', error);
+    console.log('[Push] Failed to get push token:', error);
     return null;
   }
 }
@@ -100,17 +107,25 @@ export async function registerForPushNotifications(): Promise<string | null> {
  * Save the push token to the user's profile in Supabase
  */
 export async function savePushToken(userId: string, token: string): Promise<void> {
-  const { error } = await supabase
-    .from('users')
-    .update({ 
-      push_token: token,
-      push_token_updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        push_token: token,
+        push_token_updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
 
-  if (error) {
-    console.error('Failed to save push token:', error);
-    throw error;
+    if (error) {
+      // Column might not exist yet - log but don't crash
+      console.log('[Push] Could not save push token (columns may not exist yet):', error.message);
+      return;
+    }
+
+    console.log('[Push] Token saved successfully');
+  } catch (error) {
+    console.log('[Push] Unexpected error saving token:', error);
+    // Don't throw - allow app to continue working without push notifications
   }
 }
 
@@ -118,16 +133,23 @@ export async function savePushToken(userId: string, token: string): Promise<void
  * Remove push token from user's profile (on logout)
  */
 export async function removePushToken(userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('users')
-    .update({ 
-      push_token: null,
-      push_token_updated_at: null,
-    })
-    .eq('id', userId);
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        push_token: null,
+        push_token_updated_at: null,
+      })
+      .eq('id', userId);
 
-  if (error) {
-    console.error('Failed to remove push token:', error);
+    if (error) {
+      console.log('[Push] Could not remove push token:', error.message);
+      return;
+    }
+
+    console.log('[Push] Token removed successfully');
+  } catch (error) {
+    console.log('[Push] Unexpected error removing token:', error);
   }
 }
 

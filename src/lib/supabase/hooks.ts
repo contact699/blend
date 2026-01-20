@@ -230,32 +230,41 @@ export function useUploadPhoto() {
 
   return useMutation({
     mutationFn: async (imageUri: string) => {
-      if (!user || !profile) throw new Error('Not authenticated');
-
-      const result = await securePhotoUpload(user.id, imageUri);
-      if (!result.success || !result.path) {
-        throw new Error(result.error ?? 'Upload failed');
+      if (!user || !profile) {
+        throw new Error('Not authenticated. Please log in to upload photos.');
       }
 
-      // Add photo record to database
-      const { data, error } = await supabase
-        .from('photos')
-        .insert({
-          profile_id: profile.id,
-          storage_path: result.path,
-          order_index: 0,
-          is_primary: false,
-        })
-        .select()
-        .single();
+      try {
+        const result = await securePhotoUpload(user.id, imageUri);
+        if (!result.success || !result.path) {
+          throw new Error(result.error ?? 'Upload failed');
+        }
 
-      if (error) {
-        // Clean up uploaded file on database error
-        await deletePhoto(result.path);
-        throw error;
+        // Add photo record to database
+        const { data, error } = await supabase
+          .from('photos')
+          .insert({
+            profile_id: profile.id,
+            storage_path: result.path,
+            order_index: 0,
+            is_primary: false,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Photos] Database error:', error);
+          // Clean up uploaded file on database error
+          await deletePhoto(result.path);
+          throw new Error(`Failed to save photo: ${error.message}`);
+        }
+
+        console.log('[Photos] Photo uploaded and saved successfully');
+        return data as Photo;
+      } catch (error) {
+        console.error('[Photos] Upload error:', error);
+        throw error instanceof Error ? error : new Error('Upload failed');
       }
-
-      return data as Photo;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -1177,28 +1186,38 @@ export function useEvents() {
   return useQuery({
     queryKey: ['events', user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          *,
-          host_profile:profiles!events_host_id_fkey (
-            user_id,
-            display_name,
-            photos (storage_path)
-          ),
-          event_rsvps (id, user_id, status)
-        `)
-        .eq('visibility', 'public')
-        .eq('status', 'published')
-        .gte('start_date', new Date().toISOString().split('T')[0])
-        .order('start_date', { ascending: true });
-
-      if (error) {
-        console.error('[Events] Error fetching:', error);
+      if (!user) {
+        console.log('[Events] No user authenticated, returning empty array');
         return [];
       }
+
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
+            *,
+            host_profile:profiles!events_host_id_fkey (
+              user_id,
+              display_name,
+              photos (storage_path)
+            ),
+            event_rsvps (id, user_id, status)
+          `)
+          .eq('visibility', 'public')
+          .eq('status', 'published')
+          .gte('start_date', new Date().toISOString().split('T')[0])
+          .order('start_date', { ascending: true });
+
+        if (error) {
+          console.error('[Events] Error fetching:', error);
+          // Table might not exist yet - return empty array instead of crashing
+          return [];
+        }
+
+        if (!data || data.length === 0) {
+          console.log('[Events] No events found');
+          return [];
+        }
 
       const events = data as unknown as EventWithHost[];
 
@@ -1227,8 +1246,13 @@ export function useEvents() {
         } : undefined,
       }));
 
-      // Transform to app Event type
-      return transformEvents(eventsWithUrls as unknown as SupabaseEvent[]);
+        // Transform to app Event type
+        return transformEvents(eventsWithUrls as unknown as SupabaseEvent[]);
+      } catch (error) {
+        console.error('[Events] Unexpected error:', error);
+        // Return empty array instead of crashing the app
+        return [];
+      }
     },
     enabled: !!user,
   });
@@ -1243,57 +1267,68 @@ export function useEvent(eventId: string | undefined) {
   return useQuery({
     queryKey: ['event', eventId, user?.id],
     queryFn: async () => {
-      if (!eventId || !user) throw new Error('Event ID required');
+      if (!eventId || !user) {
+        console.log('[Event] Event ID or user not available');
+        return null;
+      }
 
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          *,
-          host_profile:profiles!events_host_id_fkey (
-            user_id,
-            display_name,
-            photos (storage_path)
-          ),
-          event_rsvps (
-            id,
-            user_id,
-            status,
-            attendee_profile:profiles!event_rsvps_user_id_fkey (
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
+            *,
+            host_profile:profiles!events_host_id_fkey (
+              user_id,
               display_name,
               photos (storage_path)
+            ),
+            event_rsvps (
+              id,
+              user_id,
+              status,
+              attendee_profile:profiles!event_rsvps_user_id_fkey (
+                display_name,
+                photos (storage_path)
+              )
             )
-          )
-        `)
-        .eq('id', eventId)
-        .single();
+          `)
+          .eq('id', eventId)
+          .single();
 
-      if (error) throw error;
+        if (error) {
+          console.error('[Event] Error fetching event:', error);
+          return null;
+        }
 
-      const event = data as unknown as EventWithHost & {
-        event_rsvps: Array<{
-          id: string;
-          user_id: string;
-          status: string;
-          attendee_profile: { display_name: string; photos?: Array<{ storage_path: string }> };
-        }>;
-      };
+        const event = data as unknown as EventWithHost & {
+          event_rsvps: Array<{
+            id: string;
+            user_id: string;
+            status: string;
+            attendee_profile: { display_name: string; photos?: Array<{ storage_path: string }> };
+          }>;
+        };
 
-      // Get signed URLs
-      const allPaths = [
-        event.cover_image_path,
-        ...(event.host_profile?.photos?.map((p: { storage_path: string }) => p.storage_path) ?? []),
-        ...event.event_rsvps.flatMap((a: { attendee_profile?: { photos?: Array<{ storage_path: string }> } }) => 
-          a.attendee_profile?.photos?.map((p: { storage_path: string }) => p.storage_path) ?? []
-        ),
-      ].filter((p): p is string => !!p);
+        // Get signed URLs
+        const allPaths = [
+          event.cover_image_path,
+          ...(event.host_profile?.photos?.map((p: { storage_path: string }) => p.storage_path) ?? []),
+          ...event.event_rsvps.flatMap((a: { attendee_profile?: { photos?: Array<{ storage_path: string }> } }) =>
+            a.attendee_profile?.photos?.map((p: { storage_path: string }) => p.storage_path) ?? []
+          ),
+        ].filter((p): p is string => !!p);
 
-      const signedUrls = allPaths.length > 0 ? await getSignedPhotoUrls(allPaths) : new Map();
+        const signedUrls = allPaths.length > 0 ? await getSignedPhotoUrls(allPaths) : new Map();
 
-      return {
-        ...event,
-        coverImageSignedUrl: event.cover_image_path ? signedUrls.get(event.cover_image_path) || null : null,
-        current_user_status: event.event_rsvps?.find(a => a.user_id === user.id)?.status as EventWithHost['current_user_status'] ?? null,
-      };
+        return {
+          ...event,
+          coverImageSignedUrl: event.cover_image_path ? signedUrls.get(event.cover_image_path) || null : null,
+          current_user_status: event.event_rsvps?.find(a => a.user_id === user.id)?.status as EventWithHost['current_user_status'] ?? null,
+        };
+      } catch (error) {
+        console.error('[Event] Unexpected error:', error);
+        return null;
+      }
     },
     enabled: !!eventId && !!user,
   });
