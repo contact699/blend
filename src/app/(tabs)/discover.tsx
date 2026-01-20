@@ -2,7 +2,7 @@ import { View, Text, Pressable, Image, ScrollView, Modal, ActivityIndicator } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { SlideInRight, SlideOutLeft, FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Heart, X, MapPin, Sparkles, Globe, Video, ChevronDown, Check, Users, EyeOff, User, Brain, ChevronRight, Search } from 'lucide-react-native';
+import { Heart, X, MapPin, Sparkles, Globe, Video, ChevronDown, Check, Users, EyeOff, User, Brain, ChevronRight, Search, Zap } from 'lucide-react-native';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -17,6 +17,7 @@ import { MatchHighlights } from '@/components/MatchInsights';
 import { quickCompatibilityScore } from '@/lib/matching/compatibility-engine';
 import { Profile } from '@/lib/types';
 import PaywallModal from '@/components/PaywallModal';
+import SuperLikeModal from '@/components/SuperLikeModal';
 import { haptics } from '@/lib/haptics';
 
 type LocationFilter = 'nearby' | 'all' | 'virtual' | string;
@@ -31,6 +32,7 @@ export default function DiscoverScreen() {
   const [locationFilter, setLocationFilter] = useState<LocationFilter>('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showSuperLikeModal, setShowSuperLikeModal] = useState(false);
 
   // Smart matching state from store
   const smartMatchingEnabled = useDatingStore((s) => s.smartMatchingEnabled);
@@ -42,7 +44,9 @@ export default function DiscoverScreen() {
 
   // Subscription state
   const canUseLike = useSubscriptionStore((s) => s.canUseLike);
+  const canUseSuperLike = useSubscriptionStore((s) => s.canUseSuperLike);
   const incrementLikesUsed = useSubscriptionStore((s) => s.incrementLikesUsed);
+  const incrementSuperLikesUsed = useSubscriptionStore((s) => s.incrementSuperLikesUsed);
   const remainingLikes = useSubscriptionStore((s) => s.getRemainingLikes());
 
   // Track view start time
@@ -59,6 +63,31 @@ export default function DiscoverScreen() {
       });
 
       if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['discover'] });
+    },
+  });
+
+  // Mutation for Super Liking a profile
+  const superLikeMutation = useMutation({
+    mutationFn: async ({ toUserId, message }: { toUserId: string; message: string | null }) => {
+      if (!currentUser) throw new Error('Not authenticated');
+
+      const { error } = await supabase.from('super_likes').insert({
+        from_user_id: currentUser.id,
+        to_user_id: toUserId,
+        message,
+        seen: false,
+      });
+
+      if (error) throw error;
+
+      // Also create a regular like
+      await supabase.from('likes').insert({
+        from_user_id: currentUser.id,
+        to_user_id: toUserId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['discover'] });
@@ -158,6 +187,42 @@ export default function DiscoverScreen() {
     haptics.like();
     incrementLikesUsed();
     likeMutation.mutate(currentProfileToShow.user_id);
+    setSkippedProfiles((prev) => [...prev, currentProfileToShow.user_id]);
+  };
+
+  const handleSuperLike = () => {
+    if (!currentProfileToShow) return;
+
+    // Check if user can Super Like (subscription limits)
+    if (!canUseSuperLike()) {
+      haptics.warning();
+      setShowPaywall(true);
+      return;
+    }
+
+    // Show Super Like modal
+    haptics.tap();
+    setShowSuperLikeModal(true);
+  };
+
+  const handleSendSuperLike = (message: string | null) => {
+    if (!currentProfileToShow) return;
+
+    // Track the view with action
+    const dwellTime = Date.now() - viewStartTime.current;
+    trackProfileView(currentProfileToShow.user_id, dwellTime, 'super_like', {
+      age: currentProfileToShow.age,
+      intent_ids: [],
+      bio_length: currentProfileToShow.bio?.length ?? 0,
+      photo_count: currentProfileToShow.photos?.length ?? 0,
+      has_voice_intro: false,
+      pace_preference: 'medium',
+      response_style: 'relaxed',
+    });
+
+    haptics.success();
+    incrementSuperLikesUsed();
+    superLikeMutation.mutate({ toUserId: currentProfileToShow.user_id, message });
     setSkippedProfiles((prev) => [...prev, currentProfileToShow.user_id]);
   };
 
@@ -524,9 +589,32 @@ export default function DiscoverScreen() {
             </Pressable>
 
             <Pressable
+              onPress={handleSuperLike}
+              disabled={superLikeMutation.isPending}
+              className="w-14 h-14 rounded-full items-center justify-center ml-4 overflow-hidden"
+              accessibilityRole="button"
+              accessibilityLabel={`Super Like ${currentProfileToShow.display_name}`}
+              accessibilityHint="Send a Super Like to stand out"
+              accessibilityState={{ disabled: superLikeMutation.isPending }}
+            >
+              <LinearGradient
+                colors={['#f59e0b', '#f97316']}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Zap size={24} color="white" fill="white" />
+              </LinearGradient>
+            </Pressable>
+
+            <Pressable
               onPress={handleLike}
               disabled={likeMutation.isPending}
-              className="w-20 h-20 rounded-full items-center justify-center ml-6 overflow-hidden"
+              className="w-20 h-20 rounded-full items-center justify-center ml-4 overflow-hidden"
               accessibilityRole="button"
               accessibilityLabel={`Like ${currentProfileToShow.display_name}`}
               accessibilityHint="Send a like to this profile"
@@ -562,6 +650,14 @@ export default function DiscoverScreen() {
           visible={showPaywall}
           onClose={() => setShowPaywall(false)}
           reason="likes_limit"
+        />
+
+        {/* Super Like Modal */}
+        <SuperLikeModal
+          visible={showSuperLikeModal}
+          onClose={() => setShowSuperLikeModal(false)}
+          onSend={handleSendSuperLike}
+          recipientName={currentProfileToShow?.display_name ?? 'this person'}
         />
       </LinearGradient>
     </View>

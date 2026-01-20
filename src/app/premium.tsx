@@ -1,8 +1,8 @@
-import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sparkles,
   Heart,
@@ -22,14 +22,36 @@ import {
 import useSubscriptionStore from '@/lib/state/subscription-store';
 import { haptics } from '@/lib/haptics';
 import { SUBSCRIPTION_FEATURES } from '@/lib/types/monetization';
+import { revenueService } from '@/lib/services/revenue-service';
+import type { PurchasesOffering } from 'react-native-purchases';
 
 export default function PremiumScreen() {
   const router = useRouter();
   const [selectedPlan, setSelectedPlan] = useState<'premium' | 'premium_plus'>('premium');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [offerings, setOfferings] = useState<PurchasesOffering | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isPurchasing, setIsPurchasing] = useState<boolean>(false);
 
   const tier = useSubscriptionStore((s) => s.getTier());
   const isPremium = useSubscriptionStore((s) => s.isPremium());
+
+  // Fetch offerings on mount
+  useEffect(() => {
+    loadOfferings();
+  }, []);
+
+  const loadOfferings = async () => {
+    setIsLoading(true);
+    try {
+      const data = await revenueService.getOfferings();
+      setOfferings(data);
+    } catch (error) {
+      console.error('Failed to load offerings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSelectPlan = (plan: 'premium' | 'premium_plus') => {
     haptics.tap();
@@ -41,10 +63,83 @@ export default function PremiumScreen() {
     setBillingCycle(cycle);
   };
 
-  const handleUpgrade = () => {
+  const handleUpgrade = async () => {
     haptics.press();
-    // TODO: Integrate with RevenueCat/Stripe
-    alert('Payment integration coming soon!');
+
+    if (!offerings) {
+      Alert.alert('Error', 'Unable to load subscription options. Please try again.');
+      return;
+    }
+
+    setIsPurchasing(true);
+
+    try {
+      // Find the correct package based on selected plan and billing cycle
+      const packageId =
+        selectedPlan === 'premium'
+          ? billingCycle === 'monthly'
+            ? '$rc_monthly'
+            : '$rc_annual'
+          : billingCycle === 'monthly'
+            ? 'premium_plus_monthly'
+            : 'premium_plus_yearly';
+
+      // Find package in offerings
+      const pkg = offerings.availablePackages.find(
+        (p) =>
+          p.identifier === packageId ||
+          p.product.identifier.includes(selectedPlan) &&
+          p.product.identifier.includes(billingCycle)
+      );
+
+      if (!pkg) {
+        Alert.alert('Error', 'Selected plan not available. Please try another option.');
+        setIsPurchasing(false);
+        return;
+      }
+
+      // Attempt purchase
+      const result = await revenueService.purchaseSubscription(pkg);
+
+      if (result.success) {
+        haptics.success();
+        Alert.alert(
+          'Success!',
+          `You're now a ${selectedPlan === 'premium' ? 'Premium' : 'Premium Plus'} member! 🎉`,
+          [{ text: 'Start Exploring', onPress: () => router.back() }]
+        );
+      } else {
+        if (result.error !== 'Purchase cancelled') {
+          haptics.warning();
+          Alert.alert('Purchase Failed', result.error ?? 'Something went wrong. Please try again.');
+        }
+      }
+    } catch (error: any) {
+      haptics.warning();
+      Alert.alert('Error', error.message ?? 'Failed to process purchase');
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    haptics.tap();
+    setIsPurchasing(true);
+
+    try {
+      const result = await revenueService.restorePurchases();
+
+      if (result.success) {
+        haptics.success();
+        Alert.alert('Restored!', 'Your purchases have been restored.');
+      } else {
+        Alert.alert('No Purchases Found', 'We couldn\'t find any previous purchases for this account.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to restore purchases. Please try again.');
+    } finally {
+      setIsPurchasing(false);
+    }
   };
 
   const getPricing = (plan: 'premium' | 'premium_plus', cycle: 'monthly' | 'yearly') => {
@@ -325,6 +420,7 @@ export default function PremiumScreen() {
           <View className="px-5 pb-6 pt-4 border-t border-zinc-800">
             <Pressable
               onPress={handleUpgrade}
+              disabled={isPurchasing || isLoading}
               className="rounded-xl overflow-hidden"
               accessibilityRole="button"
               accessibilityLabel="Upgrade to premium"
@@ -333,17 +429,37 @@ export default function PremiumScreen() {
                 colors={selectedPlan === 'premium_plus' ? ['#ec4899', '#db2777'] : ['#9333ea', '#db2777']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={{ paddingVertical: 18, alignItems: 'center' }}
+                style={{ paddingVertical: 18, alignItems: 'center', opacity: isPurchasing || isLoading ? 0.6 : 1 }}
               >
-                <Text className="text-white text-lg font-bold">
-                  Upgrade to {selectedPlan === 'premium' ? 'Premium' : 'Premium Plus'}
-                </Text>
-                <Text className="text-white/80 text-sm mt-1">
-                  ${getPricing(selectedPlan, billingCycle)}/{billingCycle === 'monthly' ? 'month' : 'year'}
-                </Text>
+                {isPurchasing ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <>
+                    <Text className="text-white text-lg font-bold">
+                      Upgrade to {selectedPlan === 'premium' ? 'Premium' : 'Premium Plus'}
+                    </Text>
+                    <Text className="text-white/80 text-sm mt-1">
+                      ${getPricing(selectedPlan, billingCycle)}/{billingCycle === 'monthly' ? 'month' : 'year'}
+                    </Text>
+                  </>
+                )}
               </LinearGradient>
             </Pressable>
-            <Text className="text-gray-500 text-xs text-center mt-3">
+
+            {/* Restore Purchases Button */}
+            <Pressable
+              onPress={handleRestore}
+              disabled={isPurchasing || isLoading}
+              className="py-3 mt-3"
+              accessibilityRole="button"
+              accessibilityLabel="Restore purchases"
+            >
+              <Text className="text-purple-400 text-sm text-center font-medium">
+                Restore Purchases
+              </Text>
+            </Pressable>
+
+            <Text className="text-gray-500 text-xs text-center mt-2">
               Cancel anytime. No commitments.
             </Text>
           </View>
