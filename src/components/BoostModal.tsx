@@ -15,8 +15,8 @@ export default function BoostModal({ visible, onClose, onActivate }: BoostModalP
   const [isActivating, setIsActivating] = useState<boolean>(false);
 
   const tier = useSubscriptionStore((s) => s.getTier());
-  const features = useSubscriptionStore((s) => s.getFeatures());
-  const remainingBoosts = features.profile_boost_per_month; // TODO: Track actual usage
+  const getRemainingBoosts = useSubscriptionStore((s) => s.getRemainingBoosts);
+  const remainingBoosts = getRemainingBoosts();
 
   const handleActivate = async () => {
     if (isActivating) return;

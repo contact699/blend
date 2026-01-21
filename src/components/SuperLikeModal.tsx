@@ -22,8 +22,8 @@ export default function SuperLikeModal({
   const [isSending, setIsSending] = useState<boolean>(false);
 
   const tier = useSubscriptionStore((s) => s.getTier());
-  const features = useSubscriptionStore((s) => s.getFeatures());
-  const remainingSuperLikes = features.super_likes_per_month; // TODO: Track actual usage
+  const getRemainingSuperLikes = useSubscriptionStore((s) => s.getRemainingSuperLikes);
+  const remainingSuperLikes = getRemainingSuperLikes();
 
   const handleSend = async () => {
     if (isSending) return;

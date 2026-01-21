@@ -52,6 +52,8 @@ interface SubscriptionStore {
   canUseSuperLike: () => boolean;
   canUseBoost: () => boolean;
   getRemainingLikes: () => number | null; // null = unlimited
+  getRemainingSuperLikes: () => number;
+  getRemainingBoosts: () => number;
   getFeatures: () => SubscriptionFeatures;
   getTier: () => SubscriptionTier;
   isPremium: () => boolean;
@@ -277,6 +279,26 @@ const useSubscriptionStore = create<SubscriptionStore>()(
         if (!state.dailyUsage) return features.daily_likes_limit;
 
         return Math.max(0, features.daily_likes_limit - state.dailyUsage.likes_used);
+      },
+
+      getRemainingSuperLikes: () => {
+        const state = get();
+        const tier = state.getTier();
+        const features = SUBSCRIPTION_FEATURES[tier];
+
+        if (!state.dailyUsage) return features.super_likes_per_month;
+
+        return Math.max(0, features.super_likes_per_month - state.dailyUsage.super_likes_used);
+      },
+
+      getRemainingBoosts: () => {
+        const state = get();
+        const tier = state.getTier();
+        const features = SUBSCRIPTION_FEATURES[tier];
+
+        if (!state.dailyUsage) return features.profile_boost_per_month;
+
+        return Math.max(0, features.profile_boost_per_month - state.dailyUsage.boosts_used);
       },
 
       getFeatures: () => {
