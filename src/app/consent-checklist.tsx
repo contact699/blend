@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, SlideInRight } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -170,6 +171,23 @@ export default function ConsentChecklistScreen() {
     }))
   );
 
+  // Load saved checklist on mount
+  useEffect(() => {
+    const loadSavedChecklist = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('consent_checklist_user-1');
+        if (saved) {
+          const checklist: ConsentChecklistType = JSON.parse(saved);
+          setItems(checklist.items);
+        }
+      } catch (error) {
+        console.error('Failed to load saved consent checklist:', error);
+      }
+    };
+
+    loadSavedChecklist();
+  }, []);
+
   const handleUpdateItem = (itemId: string, value: ConsentValue) => {
     setItems((prev) =>
       prev.map((item) =>
@@ -194,20 +212,33 @@ export default function ConsentChecklistScreen() {
   const totalItems = items.length;
   const overallProgress = Math.round((totalAnswered / totalItems) * 100);
 
-  const handleSave = () => {
-    // Save the checklist
-    const checklist: ConsentChecklistType = {
-      id: `checklist-${Date.now()}`,
-      user_id: 'user-1',
-      items,
-      is_template: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+  const handleSave = async () => {
+    try {
+      // Save the checklist
+      const checklist: ConsentChecklistType = {
+        id: `checklist-${Date.now()}`,
+        user_id: 'user-1',
+        items,
+        is_template: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    // In a real app, save to store
-    console.log('Saving checklist:', checklist);
-    router.back();
+      // Save to AsyncStorage
+      await AsyncStorage.setItem(
+        `consent_checklist_${checklist.user_id}`,
+        JSON.stringify(checklist)
+      );
+
+      Alert.alert(
+        'Saved!',
+        'Your consent preferences have been saved.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (error) {
+      console.error('Failed to save consent checklist:', error);
+      Alert.alert('Error', 'Failed to save your preferences. Please try again.');
+    }
   };
 
   return (
