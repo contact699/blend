@@ -48,7 +48,7 @@ const PAYWALL_CONTENT = {
   advanced_filters: {
     icon: Sparkles,
     title: 'Advanced Filters',
-    description: 'Find exactly who you're looking for with powerful search filters',
+    description: 'Find exactly who you are looking for with powerful search filters',
     benefits: [
       'Filter by kinks & interests',
       'Relationship style filters',

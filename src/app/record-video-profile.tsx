@@ -337,7 +337,7 @@ export default function RecordVideoProfileScreen() {
                 <Text className="text-white text-center text-sm">
                   {isRecording
                     ? 'Recording... Tap to stop'
-                    : 'Introduce yourself! Talk about your interests, relationship style, or what you're looking for.'}
+                    : 'Introduce yourself! Talk about your interests, relationship style, or what you are looking for.'}
                 </Text>
               </View>
             </View>

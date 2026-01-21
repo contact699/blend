@@ -167,7 +167,7 @@ Respond in JSON:
       'looking for fun',
       'no drama',
       'new to the area',
-      'just seeing what's out there',
+      'just seeing what is out there',
       'here for a good time not a long time',
     ];
     const genericCount = genericPhrases.filter((phrase) =>
