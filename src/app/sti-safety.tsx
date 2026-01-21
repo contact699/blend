@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { STITestRecord } from '@/lib/types';
-import { useMostRecentSTITest, useAddSTIRecord } from '@/lib/supabase';
+import { useMostRecentSTITest, useAddSTIRecord, type STIRecord } from '@/lib/supabase/hooks';
 
 // Helper to map test names to database enum values
 function mapTestNameToType(testName: string): 'full_panel' | 'hiv' | 'syphilis' | 'chlamydia' | 'gonorrhea' | 'herpes' | 'hpv' | 'hepatitis_b' | 'hepatitis_c' | 'trich' | 'other' {
@@ -311,9 +311,12 @@ export default function STISafety() {
               await addSTIRecord.mutateAsync({
                 test_date: newRecord.test_date,
                 test_type: mapTestNameToType(newRecord.test_type),
-                result: 'negative', // Default to negative, user can update later
+                result: 'negative',
+                tests_included: [],
+                all_negative: true,
                 notes: newRecord.notes,
                 shared_with_matches: newRecord.share_with_matches ?? false,
+                visibility: 'matches_only',
               });
               setShowAddModal(false);
             } catch (error) {
@@ -351,9 +354,12 @@ export default function STISafety() {
       await addSTIRecord.mutateAsync({
         test_date: newRecord.test_date,
         test_type: mapTestNameToType(newRecord.test_type),
-        result: 'negative', // Default to negative, user can update later
+        result: 'negative',
+        tests_included: [],
+        all_negative: true,
         notes: newRecord.notes,
         shared_with_matches: newRecord.share_with_matches ?? false,
+        visibility: 'matches_only',
       });
       setShowAddModal(false);
     } catch (error) {

@@ -40,7 +40,7 @@ export default function WhoLikedMeScreen() {
         {
           id: '1',
           user_id: '1',
-          name: 'Sarah',
+          display_name: 'Sarah',
           age: 28,
           bio: 'Polyamorous, exploring connections',
           photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400'],
@@ -50,7 +50,7 @@ export default function WhoLikedMeScreen() {
         {
           id: '2',
           user_id: '2',
-          name: 'Alex',
+          display_name: 'Alex',
           age: 32,
           bio: 'ENM advocate, love hiking',
           photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'],
@@ -60,7 +60,7 @@ export default function WhoLikedMeScreen() {
         {
           id: '3',
           user_id: '3',
-          name: 'Jamie',
+          display_name: 'Jamie',
           age: 26,
           bio: 'Open relationship, seeking friends',
           photos: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400'],
@@ -70,7 +70,7 @@ export default function WhoLikedMeScreen() {
         {
           id: '4',
           user_id: '4',
-          name: 'Morgan',
+          display_name: 'Morgan',
           age: 30,
           bio: 'Kitchen table poly',
           photos: ['https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400'],
@@ -80,7 +80,7 @@ export default function WhoLikedMeScreen() {
         {
           id: '5',
           user_id: '5',
-          name: 'Taylor',
+          display_name: 'Taylor',
           age: 29,
           bio: 'Swinger couple seeking fun',
           photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'],
@@ -90,7 +90,7 @@ export default function WhoLikedMeScreen() {
         {
           id: '6',
           user_id: '6',
-          name: 'Riley',
+          display_name: 'Riley',
           age: 27,
           bio: 'Relationship anarchist',
           photos: ['https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400'],

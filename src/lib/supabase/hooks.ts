@@ -1012,10 +1012,14 @@ export interface STIRecord {
   id: string;
   profile_id: string;
   test_date: string;
+  next_test_date?: string;
   test_type: 'full_panel' | 'hiv' | 'syphilis' | 'chlamydia' | 'gonorrhea' | 'herpes' | 'hpv' | 'hepatitis_b' | 'hepatitis_c' | 'trich' | 'other';
   result: 'negative' | 'positive' | 'inconclusive' | 'pending';
+  tests_included: string[];
+  all_negative: boolean;
   notes?: string;
   shared_with_matches: boolean;
+  visibility: 'public' | 'matches_only' | 'private';
   created_at: string;
   updated_at: string;
 }

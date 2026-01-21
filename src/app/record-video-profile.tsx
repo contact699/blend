@@ -8,7 +8,7 @@ import {
   useCameraPermission,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import { Video } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import { X, Zap, Check, RotateCcw, Play } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { haptics } from '@/lib/haptics';
@@ -194,7 +194,7 @@ export default function RecordVideoProfileScreen() {
           <Video
             source={{ uri: recordedVideo }}
             style={{ flex: 1 }}
-            resizeMode={Video.RESIZE_MODE_COVER}
+            resizeMode={ResizeMode.COVER}
             shouldPlay
             isLooping
           />
