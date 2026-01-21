@@ -1,14 +1,15 @@
-import { useEffect } from 'react';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { useRealtimeAll } from '@/lib/supabase';
-import { usePushNotifications } from '@/lib/notifications';
-import { initSentry } from '@/lib/sentry';
+// REMOVED ALL IMPORTS THAT ACCESS NATIVE MODULES:
+// - expo-splash-screen (native module)
+// - react-native-keyboard-controller (native module)
+// - @/lib/supabase realtime hooks (uses supabase)
+// - @/lib/notifications (native module)
+// - @/lib/sentry (native module)
+// Even importing these can cause crashes before React Native is ready!
 
 const queryClient = new QueryClient();
 

@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/cn';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// REMOVED: AsyncStorage import (not used, crashes at module-level)
 
 type AuthMode = 'signin' | 'signup';
 

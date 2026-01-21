@@ -1,11 +1,29 @@
-import { useEffect, useState, useRef } from 'react';
 import { Redirect } from 'expo-router';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, Text } from 'react-native';
+
+// EMERGENCY MODE: Disable ALL logic to prevent crashes
+// Just redirect to auth screen - no Supabase, no store access, nothing
+// This file loads IMMEDIATELY on app start, so any imports can crash
+
+export default function Index() {
+  // Hardcoded redirect to auth - no session checking, no profile loading
+  // Re-enable proper logic once app is stable
+  return (
+    <View className="flex-1 bg-black items-center justify-center">
+      <Text className="text-white text-xl mb-4">Loading Blend...</Text>
+      <Redirect href="/auth" />
+    </View>
+  );
+}
+
+/* ORIGINAL CODE - DISABLED TO PREVENT CRASHES
+
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import useDatingStore from '@/lib/state/dating-store';
 import type { Session } from '@supabase/supabase-js';
 
-export default function Index() {
+function OriginalIndex() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [hasProfile, setHasProfile] = useState(false);
