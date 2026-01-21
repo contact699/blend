@@ -306,6 +306,32 @@ interface DatingStore {
   getSavedSearches: () => SavedSearch[];
 }
 
+// Create a safe storage wrapper that handles initialization errors
+const safeAsyncStorage = {
+  getItem: async (name: string) => {
+    try {
+      return await AsyncStorage.getItem(name);
+    } catch (error) {
+      console.warn('[Store] Failed to read from AsyncStorage:', error);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string) => {
+    try {
+      await AsyncStorage.setItem(name, value);
+    } catch (error) {
+      console.warn('[Store] Failed to write to AsyncStorage:', error);
+    }
+  },
+  removeItem: async (name: string) => {
+    try {
+      await AsyncStorage.removeItem(name);
+    } catch (error) {
+      console.warn('[Store] Failed to remove from AsyncStorage:', error);
+    }
+  },
+};
+
 const useDatingStore = create<DatingStore>()(
   persist(
     (set, get) => ({
@@ -2593,7 +2619,7 @@ const useDatingStore = create<DatingStore>()(
     }),
     {
       name: 'blend-store-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeAsyncStorage),
       partialize: (state) => ({
         // Only persist essential user data
         isOnboarded: state.isOnboarded,
