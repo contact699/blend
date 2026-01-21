@@ -13,6 +13,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#1a1a2e"
     },
+    "updates": {
+      "url": "https://u.expo.dev/a35aaee1-ed70-4d65-9c7f-122e88c025ff"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patrob316.blend",
