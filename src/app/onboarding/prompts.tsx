@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { Check, ChevronRight, LogOut } from 'lucide-react-native';
+import { Check, ChevronRight } from 'lucide-react-native';
 import { PROFILE_PROMPTS } from '@/lib/static-data';
 import useDatingStore from '@/lib/state/dating-store';
 import { supabase } from '@/lib/supabase';
@@ -50,21 +50,6 @@ export default function PromptsSetup() {
     };
     loadProfileData();
   }, []);
-
-  const handleSignOut = async () => {
-    try {
-      // Clear all local storage
-      await AsyncStorage.clear();
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-      // Force navigation to auth
-      router.replace('/auth');
-    } catch (e) {
-      console.log('Sign out error:', e);
-      // Force navigate anyway
-      router.replace('/auth');
-    }
-  };
 
   const handleResponseChange = (promptId: string, text: string) => {
     setResponses((prev) => ({ ...prev, [promptId]: text }));
@@ -123,7 +108,7 @@ export default function PromptsSetup() {
         'Profile creation is taking longer than expected. Please try again or check your internet connection.',
         [
           { text: 'Try Again', onPress: () => handleFinish() },
-          { text: 'Sign Out', onPress: handleSignOut },
+          { text: 'Cancel' },
         ]
       );
     }, 15000); // 15 second timeout
@@ -308,7 +293,7 @@ export default function PromptsSetup() {
         message,
         [
           { text: 'Try Again', onPress: () => handleFinish() },
-          { text: 'Sign Out', onPress: handleSignOut },
+          { text: 'Cancel' },
         ]
       );
     } finally {
@@ -325,15 +310,6 @@ export default function PromptsSetup() {
         style={{ flex: 1 }}
       >
         <SafeAreaView className="flex-1">
-          {/* Sign Out Button */}
-          <Pressable
-            onPress={handleSignOut}
-            className="absolute top-4 right-4 z-10 flex-row items-center px-3 py-2 rounded-lg bg-zinc-800/80"
-          >
-            <LogOut size={16} color="#9ca3af" />
-            <Text className="text-gray-400 text-sm ml-2">Sign Out</Text>
-          </Pressable>
-
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             className="flex-1"
