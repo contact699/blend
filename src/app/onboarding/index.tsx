@@ -3,31 +3,10 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { Users, Lock, MessageCircle, ShieldCheck, LogOut } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQueryClient } from '@tanstack/react-query';
+import { Users, Lock, MessageCircle, ShieldCheck } from 'lucide-react-native';
 
 export default function OnboardingWelcome() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-
-  const handleSignOut = async () => {
-    try {
-      // Clear all local storage
-      await AsyncStorage.clear();
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-      // Clear cached queries
-      queryClient.clear();
-      // Navigate to auth
-      router.replace('/auth');
-    } catch (e) {
-      console.log('Sign out error:', e);
-      // Force navigate anyway
-      router.replace('/auth');
-    }
-  };
 
   return (
     <View className="flex-1 bg-black">
@@ -36,17 +15,6 @@ export default function OnboardingWelcome() {
         style={{ flex: 1 }}
       >
         <SafeAreaView className="flex-1">
-          {/* Header with Sign Out Button */}
-          <View className="flex-row justify-end px-4 pt-2">
-            <Pressable
-              onPress={handleSignOut}
-              className="flex-row items-center px-3 py-2 rounded-lg bg-zinc-800/80 active:bg-zinc-700"
-            >
-              <LogOut size={16} color="#9ca3af" />
-              <Text className="text-gray-400 text-sm ml-2">Sign Out</Text>
-            </Pressable>
-          </View>
-
           <View className="flex-1 px-6 pt-8">
             {/* Logo/Branding */}
             <Animated.View
@@ -57,7 +25,7 @@ export default function OnboardingWelcome() {
                 <Users size={48} color="#c084fc" />
               </View>
               <Text className="text-4xl font-bold text-white tracking-tight">Blend</Text>
-              <Text className="text-purple-300/80 text-base mt-2">For the ethically curious</Text>
+              <Text className="text-purple-300/80 text-base mt-2">Dating for the ethically non-monogamous</Text>
             </Animated.View>
 
             {/* Features */}
@@ -68,22 +36,22 @@ export default function OnboardingWelcome() {
               <FeatureItem
                 icon={<Users size={22} color="#c084fc" />}
                 title="Couples & singles welcome"
-                description="Built for ENM, poly, swingers, and the ethically non-monogamous"
+                description="Built for poly, swingers, open relationships, and ethical non-monogamy"
+              />
+              <FeatureItem
+                icon={<ShieldCheck size={22} color="#c084fc" />}
+                title="Trust & safety"
+                description="AI verification, community vouching, and trust signals keep everyone safe"
+              />
+              <FeatureItem
+                icon={<MessageCircle size={22} color="#c084fc" />}
+                title="Smart matching"
+                description="Match by compatibility, shared values, and relationship goals"
               />
               <FeatureItem
                 icon={<Lock size={22} color="#c084fc" />}
                 title="Privacy first"
-                description="Screenshot protection and secure messaging by default"
-              />
-              <FeatureItem
-                icon={<MessageCircle size={22} color="#c084fc" />}
-                title="Intentional connections"
-                description="Match by shared desires, not just appearances"
-              />
-              <FeatureItem
-                icon={<ShieldCheck size={22} color="#c084fc" />}
-                title="Consent-centered"
-                description="Clear boundaries and communication from the start"
+                description="Control your visibility, protect your photos, and stay anonymous"
               />
             </Animated.View>
 

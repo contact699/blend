@@ -20,7 +20,7 @@ type AuthMode = 'signin' | 'signup';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<AuthMode>('signup');
+  const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -127,7 +127,18 @@ export default function AuthScreen() {
           password,
         });
 
-        if (signInError) throw signInError;
+        if (signInError) {
+          // Handle specific signin errors
+          if (signInError.message.includes('Invalid login credentials') ||
+              signInError.message.includes('Email not confirmed')) {
+            // Auto-switch to sign-up mode
+            setMode('signup');
+            setError('No account found with this email. Please sign up first.');
+            setLoading(false);
+            return;
+          }
+          throw signInError;
+        }
 
         // Check if user has a profile
         const { data: { user } } = await supabase.auth.getUser();

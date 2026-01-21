@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
-import { ChevronRight, User, MapPin, Calendar, Plus, X, EyeOff, Eye } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { ChevronRight, User, MapPin, Calendar, Plus, X, EyeOff, Eye, Globe, Navigation } from 'lucide-react-native';
 import useDatingStore from '@/lib/state/dating-store';
 import { cn } from '@/lib/cn';
 import { ProfilePhoto, Profile } from '@/lib/types';
@@ -26,6 +27,7 @@ export default function ProfileSetup() {
   const [city, setCity] = useState('');
   const [bio, setBio] = useState('');
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
+  const [locationMode, setLocationMode] = useState<'online' | 'current' | 'choose'>('choose');
 
   // Initialize currentProfile if it's null or from mock data
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function ProfileSetup() {
     if (!result.canceled && result.assets[0]) {
       setPhotos([...photos, {
         uri: result.assets[0].uri,
-        hidden_until_match: true // Default to hidden
+        hidden_until_match: false // Default to visible
       }]);
     }
   };
@@ -87,6 +89,28 @@ export default function ProfileSetup() {
         ? { ...photo, hidden_until_match: !photo.hidden_until_match }
         : photo
     ));
+  };
+
+  const handleCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (address.city) {
+        setCity(address.city);
+        setLocationMode('current');
+      }
+    } catch (error) {
+      console.error('Failed to get location:', error);
+    }
   };
 
   const handleContinue = async () => {
@@ -207,22 +231,101 @@ export default function ProfileSetup() {
                   )}
                 </View>
 
-                {/* City */}
+                {/* Location */}
                 <View className="mb-5">
                   <Text className="text-gray-300 text-sm font-medium mb-2">
-                    City
+                    Location
                   </Text>
-                  <View className="bg-zinc-900/80 rounded-xl flex-row items-center px-4 border border-zinc-800">
-                    <MapPin size={20} color="#a855f7" />
-                    <TextInput
-                      value={city}
-                      onChangeText={setCity}
-                      placeholder="Where are you based?"
-                      placeholderTextColor="#6b7280"
-                      className="flex-1 text-white py-4 px-3 text-base"
-                      maxLength={50}
-                    />
+
+                  {/* Location Mode Selector */}
+                  <View className="flex-row gap-2 mb-3">
+                    <Pressable
+                      onPress={() => {
+                        setLocationMode('online');
+                        setCity('Online Only');
+                      }}
+                      className={cn(
+                        "flex-1 rounded-xl p-3 border",
+                        locationMode === 'online'
+                          ? "bg-purple-500/20 border-purple-500"
+                          : "bg-zinc-900/80 border-zinc-800"
+                      )}
+                    >
+                      <View className="items-center">
+                        <Globe size={20} color={locationMode === 'online' ? "#a855f7" : "#9ca3af"} />
+                        <Text className={cn(
+                          "text-xs mt-1",
+                          locationMode === 'online' ? "text-purple-300" : "text-gray-400"
+                        )}>
+                          Online Only
+                        </Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={handleCurrentLocation}
+                      className={cn(
+                        "flex-1 rounded-xl p-3 border",
+                        locationMode === 'current'
+                          ? "bg-purple-500/20 border-purple-500"
+                          : "bg-zinc-900/80 border-zinc-800"
+                      )}
+                    >
+                      <View className="items-center">
+                        <Navigation size={20} color={locationMode === 'current' ? "#a855f7" : "#9ca3af"} />
+                        <Text className={cn(
+                          "text-xs mt-1",
+                          locationMode === 'current' ? "text-purple-300" : "text-gray-400"
+                        )}>
+                          Current
+                        </Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => setLocationMode('choose')}
+                      className={cn(
+                        "flex-1 rounded-xl p-3 border",
+                        locationMode === 'choose'
+                          ? "bg-purple-500/20 border-purple-500"
+                          : "bg-zinc-900/80 border-zinc-800"
+                      )}
+                    >
+                      <View className="items-center">
+                        <MapPin size={20} color={locationMode === 'choose' ? "#a855f7" : "#9ca3af"} />
+                        <Text className={cn(
+                          "text-xs mt-1",
+                          locationMode === 'choose' ? "text-purple-300" : "text-gray-400"
+                        )}>
+                          Choose
+                        </Text>
+                      </View>
+                    </Pressable>
                   </View>
+
+                  {/* City Input (only show for 'choose' or 'current' modes) */}
+                  {(locationMode === 'choose' || locationMode === 'current') && (
+                    <View className="bg-zinc-900/80 rounded-xl flex-row items-center px-4 border border-zinc-800">
+                      <MapPin size={20} color="#a855f7" />
+                      <TextInput
+                        value={city}
+                        onChangeText={setCity}
+                        placeholder="Enter your city"
+                        placeholderTextColor="#6b7280"
+                        className="flex-1 text-white py-4 px-3 text-base"
+                        maxLength={50}
+                        editable={locationMode === 'choose'}
+                      />
+                    </View>
+                  )}
+
+                  {locationMode === 'online' && (
+                    <View className="bg-purple-500/10 rounded-xl p-3 border border-purple-500/20">
+                      <Text className="text-purple-300 text-sm">
+                        You'll only be visible to others online. You can change this later.
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Bio */}
@@ -263,9 +366,9 @@ export default function ProfileSetup() {
                   </Text>
                   <View className="bg-purple-500/10 rounded-xl p-3 mb-3 border border-purple-500/20">
                     <View className="flex-row items-center">
-                      <EyeOff size={16} color="#a855f7" />
+                      <Eye size={16} color="#a855f7" />
                       <Text className="text-purple-300 text-sm ml-2 flex-1">
-                        Tap the eye icon on each photo to control visibility. Hidden photos are only revealed after matching.
+                        Photos are visible by default. Tap the eye icon to hide photos until after matching.
                       </Text>
                     </View>
                   </View>
