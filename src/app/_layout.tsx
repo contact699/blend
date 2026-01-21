@@ -10,20 +10,6 @@ import { useRealtimeAll } from '@/lib/supabase';
 import { usePushNotifications } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
 
-// Initialize Sentry error tracking as early as possible
-try {
-  initSentry();
-} catch (e) {
-  console.warn('Sentry init failed:', e);
-}
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-try {
-  SplashScreen.preventAutoHideAsync();
-} catch (e) {
-  console.warn('SplashScreen.preventAutoHideAsync failed:', e);
-}
-
 const queryClient = new QueryClient();
 
 // Custom dark theme for the dating app
@@ -41,12 +27,39 @@ const DatingDarkTheme = {
 function AppContent() {
   // Subscribe to real-time updates for matches, likes, pings, events
   useRealtimeAll();
-  
+
   // Initialize push notifications
   usePushNotifications();
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    // Initialize Sentry error tracking
+    let sentryInitialized = false;
+    try {
+      initSentry();
+      sentryInitialized = true;
+    } catch (e) {
+      console.warn('Sentry init failed:', e);
+    }
+
+    // Prevent the splash screen from auto-hiding
+    let splashScreenPrevented = false;
+    try {
+      SplashScreen.preventAutoHideAsync();
+      splashScreenPrevented = true;
+    } catch (e) {
+      console.warn('SplashScreen.preventAutoHideAsync failed:', e);
+    }
+
+    // Hide splash screen after a short delay
+    const timer = setTimeout(() => {
+      if (splashScreenPrevented) {
+        SplashScreen.hideAsync().catch(e => console.warn('SplashScreen.hideAsync failed:', e));
+      }
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, []);
 
   return (

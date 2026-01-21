@@ -25,24 +25,32 @@ export function initSentry() {
       return;
     }
 
+    // Safely get app version
+    let appVersion = '1.0.0';
+    try {
+      appVersion = Constants.expoConfig?.version ?? '1.0.0';
+    } catch (e) {
+      console.warn('Could not read app version, using default');
+    }
+
     Sentry.init({
       dsn: SENTRY_DSN,
-      
+
       // Environment based on Expo config
       environment: __DEV__ ? 'development' : 'production',
-      
+
       // App version from Expo config
-      release: Constants.expoConfig?.version ?? '1.0.0',
-      
+      release: appVersion,
+
       // Only send errors in production (disable in dev)
       enabled: !__DEV__,
-      
+
       // Sample rate for performance monitoring (0.0 to 1.0)
       tracesSampleRate: __DEV__ ? 0 : 0.2,
-      
+
       // Attach stack traces to all messages
       attachStacktrace: true,
-      
+
       // Before sending, filter/modify events
       beforeSend(event, hint) {
         // Don't send events in development
@@ -50,7 +58,7 @@ export function initSentry() {
           console.log('Sentry event (dev):', event.message || event.exception);
           return null;
         }
-        
+
         // Filter out known non-critical errors
         const message = event.message || '';
         if (
@@ -60,10 +68,10 @@ export function initSentry() {
         ) {
           return null;
         }
-        
+
         return event;
       },
-      
+
       // Breadcrumb filtering
       beforeBreadcrumb(breadcrumb) {
         if (breadcrumb.category === 'console') {
