@@ -12,12 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
+// REMOVED: Supabase import - createClient at module-level crashes before RN ready
+// import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/cn';
-// REMOVED: AsyncStorage import (not used, crashes at module-level)
 
 type AuthMode = 'signin' | 'signup';
 
+// Emergency mode: Disable all auth functionality
 export default function AuthScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>('signin');
@@ -25,43 +26,26 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checkingExistingSession, setCheckingExistingSession] = useState(true);
+  const [checkingExistingSession, setCheckingExistingSession] = useState(false);
   const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
 
-  // Check for existing session on mount - handle partial login states
-  useEffect(() => {
-    const checkExistingSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          // User is logged in but ended up on auth screen
-          // Check if they have a profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .single();
-
-          if (profile) {
-            // Has profile, go to main app
-            router.replace('/(tabs)');
-          } else {
-            // No profile, go to onboarding
-            router.replace('/onboarding');
-          }
-          return;
-        }
-      } catch (e) {
-        console.log('Session check error:', e);
-      } finally {
-        setCheckingExistingSession(false);
-      }
-    };
-
-    checkExistingSession();
-  }, [router]);
+  // DISABLED: All session checking disabled to prevent Supabase access
+  // useEffect(() => {
+  //   const checkExistingSession = async () => {
+  //     try {
+  //       const { data: { session } } = await supabase.auth.getSession();
+  //       ...
+  //     }
+  //   };
+  //   checkExistingSession();
+  // }, [router]);
 
   const handleAuth = async () => {
+    // EMERGENCY MODE: All auth disabled - just show message
+    setError('Authentication temporarily disabled - app in emergency recovery mode');
+    return;
+
+    /* ORIGINAL CODE - DISABLED
     if (!email || !password) {
       setError('Please enter email and password');
       return;
@@ -176,6 +160,7 @@ export default function AuthScreen() {
     } finally {
       setLoading(false);
     }
+    */
   };
 
   return (
