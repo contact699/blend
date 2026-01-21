@@ -1,4 +1,4 @@
-import { View, Pressable, ActivityIndicator } from 'react-native';
+import { View, Pressable, ActivityIndicator, Text } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react-native';

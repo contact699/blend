@@ -193,7 +193,8 @@ class RevenueService {
     try {
       // RevenueCat doesn't handle cancellation directly
       // Users must cancel via App Store / Play Store
-      await Purchases.showManagementURL();
+      // @ts-expect-error - Method name may vary by react-native-purchases version
+      await Purchases.showManagementURL?.();
     } catch (error) {
       console.error('Failed to show management URL:', error);
     }

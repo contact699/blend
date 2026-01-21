@@ -30,7 +30,7 @@ interface OptimizeImageOptions {
   format?: 'jpeg' | 'png';
 }
 
-interface OptimizedImage {
+export interface OptimizedImage {
   uri: string;
   width: number;
   height: number;
@@ -50,7 +50,7 @@ export async function optimizeImage(
   try {
     // Get original image info
     const originalInfo = await FileSystem.getInfoAsync(uri);
-    const originalSize = originalInfo.size || 0;
+    const originalSize = (originalInfo.exists && 'size' in originalInfo) ? originalInfo.size : 0;
 
     imageLogger.debug('Starting image optimization', {
       uri,
@@ -93,7 +93,7 @@ export async function optimizeImage(
 
     // Get optimized image info
     const optimizedInfo = await FileSystem.getInfoAsync(manipResult.uri);
-    const optimizedSize = optimizedInfo.size || 0;
+    const optimizedSize = (optimizedInfo.exists && 'size' in optimizedInfo) ? optimizedInfo.size : 0;
 
     const duration = Date.now() - startTime;
     const reduction = ((originalSize - optimizedSize) / originalSize * 100).toFixed(1);
@@ -190,7 +190,7 @@ export async function cropToSquare(
       uri: croppedResult.uri,
       width: croppedResult.width,
       height: croppedResult.height,
-      size: info.size || 0,
+      size: (info.exists && 'size' in info) ? info.size : 0,
     };
   } catch (error) {
     imageLogger.error('Image cropping failed', error);
@@ -230,7 +230,7 @@ export async function needsOptimization(
 ): Promise<boolean> {
   try {
     const info = await FileSystem.getInfoAsync(uri);
-    return (info.size || 0) > maxSizeBytes;
+    return (info.exists && 'size' in info) ? info.size > maxSizeBytes : false;
   } catch (error) {
     imageLogger.error('Failed to check if image needs optimization', error);
     return false;

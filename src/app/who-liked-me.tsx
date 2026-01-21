@@ -42,60 +42,90 @@ export default function WhoLikedMeScreen() {
           user_id: '1',
           display_name: 'Sarah',
           age: 28,
+          city: 'San Francisco',
           bio: 'Polyamorous, exploring connections',
           photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          pace_preference: 'medium',
+          no_photos: false,
+          open_to_meet: true,
+          response_style: 'relaxed',
+          intent_ids: [],
+          prompt_responses: [],
         },
         {
           id: '2',
           user_id: '2',
           display_name: 'Alex',
           age: 32,
+          city: 'Oakland',
           bio: 'ENM advocate, love hiking',
           photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          pace_preference: 'fast',
+          no_photos: false,
+          open_to_meet: true,
+          response_style: 'quick',
+          intent_ids: [],
+          prompt_responses: [],
         },
         {
           id: '3',
           user_id: '3',
           display_name: 'Jamie',
           age: 26,
+          city: 'Berkeley',
           bio: 'Open relationship, seeking friends',
           photos: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          pace_preference: 'slow',
+          no_photos: false,
+          open_to_meet: true,
+          response_style: 'relaxed',
+          intent_ids: [],
+          prompt_responses: [],
         },
         {
           id: '4',
           user_id: '4',
           display_name: 'Morgan',
           age: 30,
+          city: 'San Jose',
           bio: 'Kitchen table poly',
           photos: ['https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          pace_preference: 'medium',
+          no_photos: false,
+          open_to_meet: true,
+          response_style: 'quick',
+          intent_ids: [],
+          prompt_responses: [],
         },
         {
           id: '5',
           user_id: '5',
           display_name: 'Taylor',
           age: 29,
+          city: 'Palo Alto',
           bio: 'Swinger couple seeking fun',
           photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          pace_preference: 'fast',
+          no_photos: false,
+          open_to_meet: true,
+          response_style: 'quick',
+          intent_ids: [],
+          prompt_responses: [],
         },
         {
           id: '6',
           user_id: '6',
           display_name: 'Riley',
           age: 27,
+          city: 'Santa Cruz',
           bio: 'Relationship anarchist',
           photos: ['https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          pace_preference: 'slow',
+          no_photos: false,
+          open_to_meet: true,
+          response_style: 'relaxed',
+          intent_ids: [],
+          prompt_responses: [],
         },
       ];
 
@@ -111,7 +141,7 @@ export default function WhoLikedMeScreen() {
     haptics.like();
     // TODO: Implement like-back logic
     // This should create a match since both users liked each other
-    console.log('Liked back:', profile.name);
+    console.log('Liked back:', profile.display_name);
   };
 
   const handleUpgrade = () => {
@@ -130,13 +160,13 @@ export default function WhoLikedMeScreen() {
           } else {
             haptics.tap();
             // TODO: Navigate to profile
-            console.log('View profile:', item.name);
+            console.log('View profile:', item.display_name);
           }
         }}
         className="mb-4"
         style={{ width: ITEM_SIZE }}
         accessibilityRole="button"
-        accessibilityLabel={shouldBlur ? 'Locked profile - upgrade to view' : `View ${item.name}'s profile`}
+        accessibilityLabel={shouldBlur ? 'Locked profile - upgrade to view' : `View ${item.display_name}'s profile`}
       >
         <View className="relative rounded-2xl overflow-hidden" style={{ height: ITEM_SIZE * 1.4 }}>
           <Image
@@ -167,7 +197,7 @@ export default function WhoLikedMeScreen() {
           {!shouldBlur && (
             <View className="absolute bottom-0 left-0 right-0 p-3">
               <Text className="text-white font-bold text-base">
-                {item.name}, {item.age}
+                {item.display_name}, {item.age}
               </Text>
               <Text className="text-white/80 text-xs mt-0.5" numberOfLines={2}>
                 {item.bio}

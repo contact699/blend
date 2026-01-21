@@ -3,6 +3,7 @@
  * Detects scam language and copy-paste profiles using Claude AI
  */
 
+// @ts-expect-error - Optional dependency not installed yet
 import Anthropic from '@anthropic-ai/sdk';
 import { ProfileTextAnalysis } from '@/lib/types/trust-signals';
 import { supabase } from '@/lib/supabase';

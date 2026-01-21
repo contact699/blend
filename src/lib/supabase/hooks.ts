@@ -540,11 +540,10 @@ export function useSendMessage() {
           sender_id: user!.id,
           message_type: variables.message_type || 'text',
           content: variables.content,
+          media_storage_path: null,
           is_first_message: variables.is_first_message || false,
           created_at: new Date().toISOString(),
           read_at: null,
-          viewed_at: null,
-          is_expired: false,
         };
 
         return old ? [...old, optimisticMessage] : [optimisticMessage];
@@ -1098,10 +1097,14 @@ export function useAddSTIRecord() {
         .insert({
           profile_id: profile.id,
           test_date: input.test_date,
+          next_test_date: input.next_test_date ?? null,
           test_type: input.test_type,
           result: input.result,
+          tests_included: input.tests_included,
+          all_negative: input.all_negative,
           notes: input.notes ?? null,
           shared_with_matches: input.shared_with_matches,
+          visibility: input.visibility,
         })
         .select()
         .single();

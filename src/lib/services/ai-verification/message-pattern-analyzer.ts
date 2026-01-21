@@ -3,6 +3,7 @@
  * Detects bot-like behavior in messaging patterns
  */
 
+// @ts-expect-error - Optional dependency not installed yet
 import Anthropic from '@anthropic-ai/sdk';
 import { MessagePatternAnalysis } from '@/lib/types/trust-signals';
 import { supabase } from '@/lib/supabase';

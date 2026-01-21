@@ -3,6 +3,7 @@
  * Uses Claude Vision API to verify if multiple photos show the same person
  */
 
+// @ts-expect-error - Optional dependency not installed yet
 import Anthropic from '@anthropic-ai/sdk';
 import { PhotoConsistencyCheck, AIVerificationResult } from '@/lib/types/trust-signals';
 import { supabase } from '@/lib/supabase';

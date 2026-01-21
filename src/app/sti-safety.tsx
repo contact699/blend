@@ -306,23 +306,23 @@ export default function STISafety() {
         <AddTestModal
           visible={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSave={async (newRecord) => {
-            try {
-              await addSTIRecord.mutateAsync({
-                test_date: newRecord.test_date,
-                test_type: mapTestNameToType(newRecord.test_type),
-                result: 'negative',
-                tests_included: [],
-                all_negative: true,
-                notes: newRecord.notes,
-                shared_with_matches: newRecord.share_with_matches ?? false,
-                visibility: 'matches_only',
-              });
+          onSave={(newRecord) => {
+            addSTIRecord.mutateAsync({
+              test_date: newRecord.test_date,
+              next_test_date: newRecord.next_test_date,
+              test_type: newRecord.tests_included.length > 0 ? 'full_panel' : 'other',
+              result: newRecord.all_negative ? 'negative' : 'positive',
+              tests_included: newRecord.tests_included,
+              all_negative: newRecord.all_negative,
+              notes: newRecord.notes,
+              shared_with_matches: newRecord.visibility === 'public' || newRecord.visibility === 'matches_only',
+              visibility: newRecord.visibility,
+            }).then(() => {
               setShowAddModal(false);
-            } catch (error) {
+            }).catch((error) => {
               console.error('[STI Safety] Error adding record:', error);
               Alert.alert('Error', 'Failed to save test record. Please try again.');
-            }
+            });
           }}
         />
       </SafeAreaView>
@@ -344,28 +344,23 @@ export default function STISafety() {
     return 'Up to date';
   };
 
-  const handleSaveNewRecord = async (newRecord: {
-    test_date: string;
-    test_type: string;
-    notes?: string;
-    share_with_matches?: boolean;
-  }) => {
-    try {
-      await addSTIRecord.mutateAsync({
-        test_date: newRecord.test_date,
-        test_type: mapTestNameToType(newRecord.test_type),
-        result: 'negative',
-        tests_included: [],
-        all_negative: true,
-        notes: newRecord.notes,
-        shared_with_matches: newRecord.share_with_matches ?? false,
-        visibility: 'matches_only',
-      });
+  const handleSaveNewRecord = (newRecord: Omit<STITestRecord, 'id' | 'user_id'>) => {
+    addSTIRecord.mutateAsync({
+      test_date: newRecord.test_date,
+      next_test_date: newRecord.next_test_date,
+      test_type: newRecord.tests_included.length > 0 ? 'full_panel' : 'other',
+      result: newRecord.all_negative ? 'negative' : 'positive',
+      tests_included: newRecord.tests_included,
+      all_negative: newRecord.all_negative,
+      notes: newRecord.notes,
+      shared_with_matches: newRecord.visibility === 'public' || newRecord.visibility === 'matches_only',
+      visibility: newRecord.visibility,
+    }).then(() => {
       setShowAddModal(false);
-    } catch (error) {
+    }).catch((error) => {
       console.error('[STI Safety] Error adding record:', error);
       Alert.alert('Error', 'Failed to save test record. Please try again.');
-    }
+    });
   };
 
   return (

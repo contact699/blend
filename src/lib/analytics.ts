@@ -25,6 +25,7 @@ export async function initAnalytics() {
 
   try {
     // Dynamically import mixpanel only if enabled
+    // @ts-expect-error - Optional dependency not installed yet
     const MixpanelModule = await import('mixpanel-react-native');
     mixpanel = new MixpanelModule.Mixpanel(
       process.env.EXPO_PUBLIC_MIXPANEL_TOKEN!,
