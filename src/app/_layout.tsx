@@ -25,43 +25,14 @@ const DatingDarkTheme = {
 
 // Inner component to use hooks inside QueryClientProvider
 function AppContent() {
-  // Subscribe to real-time updates for matches, likes, pings, events
-  // DISABLED: This might be crashing the app on startup
-  // useRealtimeAll();
-
-  // Initialize push notifications
-  usePushNotifications();
-
-  useEffect(() => {
-    // Initialize Sentry error tracking
-    let sentryInitialized = false;
-    try {
-      initSentry();
-      sentryInitialized = true;
-    } catch (e) {
-      console.warn('Sentry init failed:', e);
-    }
-
-    // Prevent the splash screen from auto-hiding
-    let splashScreenPrevented = false;
-    try {
-      SplashScreen.preventAutoHideAsync();
-      splashScreenPrevented = true;
-    } catch (e) {
-      console.warn('SplashScreen.preventAutoHideAsync failed:', e);
-    }
-
-    // Hide splash screen after a short delay
-    const timer = setTimeout(() => {
-      if (splashScreenPrevented) {
-        SplashScreen.hideAsync().catch(e => console.warn('SplashScreen.hideAsync failed:', e));
-      }
-    }, 1000);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, []);
+  // DISABLED ALL NATIVE MODULE INITIALIZATION TO PREVENT CRASHES:
+  // - useRealtimeAll() - Supabase realtime subscriptions
+  // - usePushNotifications() - Expo notifications
+  // - initSentry() - Sentry error tracking
+  // - SplashScreen API - Native splash screen control
+  //
+  // All of these can cause crashes if accessed before React Native bridge is ready.
+  // App will start in minimal mode - re-enable features one by one once stable.
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

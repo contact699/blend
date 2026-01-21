@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// DISABLED: persist middleware causes AsyncStorage access at module-level (crashes before RN ready)
+// import { persist, createJSONStorage } from 'zustand/middleware';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Profile,
   Match,
@@ -306,35 +307,9 @@ interface DatingStore {
   getSavedSearches: () => SavedSearch[];
 }
 
-// Create a safe storage wrapper that handles initialization errors
-const safeAsyncStorage = {
-  getItem: async (name: string) => {
-    try {
-      return await AsyncStorage.getItem(name);
-    } catch (error) {
-      console.warn('[Store] Failed to read from AsyncStorage:', error);
-      return null;
-    }
-  },
-  setItem: async (name: string, value: string) => {
-    try {
-      await AsyncStorage.setItem(name, value);
-    } catch (error) {
-      console.warn('[Store] Failed to write to AsyncStorage:', error);
-    }
-  },
-  removeItem: async (name: string) => {
-    try {
-      await AsyncStorage.removeItem(name);
-    } catch (error) {
-      console.warn('[Store] Failed to remove from AsyncStorage:', error);
-    }
-  },
-};
-
-const useDatingStore = create<DatingStore>()(
-  persist(
-    (set, get) => ({
+// DISABLED: All persistence disabled to prevent module-level AsyncStorage crashes
+// Store will reset on app restart but won't crash on launch
+const useDatingStore = create<DatingStore>()((set, get) => ({
       isOnboarded: false,
       currentUserId: '', // Will be set by auth
       currentProfile: null, // Will be loaded from Supabase
@@ -2616,33 +2591,7 @@ const useDatingStore = create<DatingStore>()(
         const state = get();
         return state.savedSearches.filter((s) => s.user_id === state.currentUserId);
       },
-    }),
-    {
-      name: 'blend-store-v1',
-      storage: createJSONStorage(() => safeAsyncStorage),
-      partialize: (state) => ({
-        // Only persist essential user data
-        isOnboarded: state.isOnboarded,
-        currentUserId: state.currentUserId,
-        currentProfile: state.currentProfile,
-        discoveredProfiles: state.discoveredProfiles,
-        // Persist matches and threads but limit to recent ones
-        matches: state.matches.slice(-50),
-        threads: state.threads.slice(-50),
-        // Only persist text messages (no media URLs which are large)
-        messages: state.messages
-          .filter(m => !m.media_url || m.is_expired)
-          .slice(-200)
-          .map(m => ({
-            ...m,
-            media_url: undefined, // Don't persist media URLs
-          })),
-        // Persist likes and pings
-        likes: state.likes.slice(-50),
-        pings: state.pings.slice(-50),
-      }),
-    }
-  )
+    })
 );
 
 export default useDatingStore;

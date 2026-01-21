@@ -12,6 +12,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// CRITICAL: Disable AsyncStorage to prevent module-level native access crash
+// AsyncStorage cannot be accessed before React Native bridge is ready
+// Using memory-only storage temporarily until app initializes properly
+const memoryStorage = {
+  getItem: async (_key: string) => null,
+  setItem: async (_key: string, _value: string) => {},
+  removeItem: async (_key: string) => {},
+};
+
 // Using generic client type since database schema is defined at runtime
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const supabase: SupabaseClient<any, 'public', any> = createClient(
@@ -19,9 +28,9 @@ export const supabase: SupabaseClient<any, 'public', any> = createClient(
   supabaseAnonKey || 'placeholder-key',
   {
     auth: {
-      storage: AsyncStorage,
+      storage: memoryStorage as any, // Use memory storage to prevent crash
       autoRefreshToken: true,
-      persistSession: true,
+      persistSession: false, // DISABLED: Prevent AsyncStorage access
       detectSessionInUrl: false,
     },
   }
