@@ -195,3 +195,4 @@ function OriginalIndex() {
   // Logged in with profile -> Main app
   return <Redirect href="/(tabs)" />;
 }
+*/
