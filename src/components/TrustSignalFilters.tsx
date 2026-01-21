@@ -1,6 +1,6 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useState } from 'react';
-import { Slider } from '@react-native-community/slider';
+import Slider from '@react-native-community/slider';
 import {
   Users,
   Calendar,
@@ -92,7 +92,7 @@ export default function TrustSignalFilters({ filters, onChange }: TrustSignalFil
             </View>
             <Slider
               value={filters.min_vouches || 0}
-              onValueChange={(value) => updateFilter('min_vouches', Math.round(value))}
+              onValueChange={(value: number) => updateFilter('min_vouches', Math.round(value))}
               minimumValue={0}
               maximumValue={10}
               step={1}
@@ -132,7 +132,7 @@ export default function TrustSignalFilters({ filters, onChange }: TrustSignalFil
             </View>
             <Slider
               value={filters.min_account_age_days || 0}
-              onValueChange={(value) => updateFilter('min_account_age_days', Math.round(value))}
+              onValueChange={(value: number) => updateFilter('min_account_age_days', Math.round(value))}
               minimumValue={0}
               maximumValue={365}
               step={7}

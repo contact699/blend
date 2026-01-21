@@ -194,7 +194,7 @@ export default function RecordVideoProfileScreen() {
           <Video
             source={{ uri: recordedVideo }}
             style={{ flex: 1 }}
-            resizeMode="cover"
+            resizeMode={Video.RESIZE_MODE_COVER}
             shouldPlay
             isLooping
           />

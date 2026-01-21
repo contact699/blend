@@ -341,7 +341,12 @@ export default function STISafety() {
     return 'Up to date';
   };
 
-  const handleSaveNewRecord = async (newRecord: Omit<STITestRecord, 'id' | 'user_id'>) => {
+  const handleSaveNewRecord = async (newRecord: {
+    test_date: string;
+    test_type: string;
+    notes?: string;
+    share_with_matches?: boolean;
+  }) => {
     try {
       await addSTIRecord.mutateAsync({
         test_date: newRecord.test_date,
@@ -440,7 +445,7 @@ export default function STISafety() {
           <Animated.View entering={FadeInDown.delay(200)} className="mb-6">
             <Text className="text-white font-semibold text-lg mb-3">Tests Included</Text>
             <View className="flex-row flex-wrap gap-2">
-              {record.tests_included.map((test) => (
+              {record.tests_included.map((test: string) => (
                 <View
                   key={test}
                   className="px-3 py-2 rounded-xl bg-zinc-800/50 border border-zinc-700/50"

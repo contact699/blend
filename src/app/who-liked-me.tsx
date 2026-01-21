@@ -7,14 +7,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import useSubscriptionStore from '@/lib/state/subscription-store';
 import { haptics } from '@/lib/haptics';
-import type { UserProfile } from '@/lib/types';
+import type { Profile } from '@/lib/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = (SCREEN_WIDTH - 48) / 2; // 2 columns with padding
 
 export default function WhoLikedMeScreen() {
   const router = useRouter();
-  const [likes, setLikes] = useState<UserProfile[]>([]);
+  const [likes, setLikes] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const tier = useSubscriptionStore((s) => s.getTier());
@@ -36,7 +36,7 @@ export default function WhoLikedMeScreen() {
       //   .order('created_at', { ascending: false });
 
       // Mock data for now
-      const mockLikes: UserProfile[] = [
+      const mockLikes: Profile[] = [
         {
           id: '1',
           user_id: '1',
@@ -107,7 +107,7 @@ export default function WhoLikedMeScreen() {
     }
   };
 
-  const handleLikeBack = (profile: UserProfile) => {
+  const handleLikeBack = (profile: Profile) => {
     haptics.like();
     // TODO: Implement like-back logic
     // This should create a match since both users liked each other
@@ -119,7 +119,7 @@ export default function WhoLikedMeScreen() {
     router.push('/premium');
   };
 
-  const renderLikeItem = ({ item, index }: { item: UserProfile; index: number }) => {
+  const renderLikeItem = ({ item, index }: { item: Profile; index: number }) => {
     const shouldBlur = !canSeeWhoLiked && index >= 2;
 
     return (

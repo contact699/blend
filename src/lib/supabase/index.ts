@@ -42,6 +42,9 @@ export {
   useProfileViews,
   useTrackProfileView,
   useRefreshTasteProfile,
+  // STI Safety
+  useMostRecentSTITest,
+  useAddSTIRecord,
 } from './hooks';
 
 export {

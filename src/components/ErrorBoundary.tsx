@@ -126,8 +126,16 @@ export function ErrorBoundaryWrapper({
 
   return (
     <SentryErrorBoundary
-      fallback={(props) => <FallbackComponent {...props} />}
-      onError={handleError}
+      fallback={(props: { error: unknown; componentStack: string; eventId: string; resetError: () => void }) => (
+        <FallbackComponent
+          error={props.error instanceof Error ? props.error : new Error(String(props.error))}
+          resetError={props.resetError}
+        />
+      )}
+      onError={(error: unknown, componentStack: string, eventId: string) => {
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        handleError(errorObj, { componentStack } as React.ErrorInfo);
+      }}
     >
       {children}
     </SentryErrorBoundary>

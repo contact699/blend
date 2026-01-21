@@ -18,7 +18,7 @@ interface StoreItem {
   savings?: string;
   icon: React.ReactNode;
   color: string;
-  gradient: string[];
+  gradient: readonly [string, string, ...string[]];
 }
 
 const STORE_ITEMS: StoreItem[] = [

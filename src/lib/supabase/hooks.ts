@@ -786,6 +786,7 @@ interface PartnerLinkWithProfile {
     display_name: string;
     age: number;
     city: string;
+    bio?: string;
     photos?: Array<{ storage_path: string; signedUrl?: string }>;
   };
 }
@@ -810,6 +811,7 @@ export function usePartnerLinks() {
               display_name,
               age,
               city,
+              bio,
               photos (storage_path)
             )
           `)
