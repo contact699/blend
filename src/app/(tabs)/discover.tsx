@@ -2,7 +2,7 @@ import { View, Text, Pressable, Image, ScrollView, Modal, ActivityIndicator } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { SlideInRight, SlideOutLeft, FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Heart, X, MapPin, Sparkles, Globe, Video, ChevronDown, Check, Users, EyeOff, User, Brain, ChevronRight, Search, Zap } from 'lucide-react-native';
+import { Heart, X, MapPin, Sparkles, Globe, Video, ChevronDown, Check, Users, EyeOff, User, Brain, ChevronRight, Search, Zap, Shield } from 'lucide-react-native';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -41,6 +41,7 @@ export default function DiscoverScreen() {
   const trackProfileView = useDatingStore((s) => s.trackProfileView);
   const cacheCompatibilityScore = useDatingStore((s) => s.cacheCompatibilityScore);
   const getCachedCompatibilityScore = useDatingStore((s) => s.getCachedCompatibilityScore);
+  const getTrustScore = useDatingStore((s) => s.getTrustScore);
 
   // Subscription state
   const canUseLike = useSubscriptionStore((s) => s.canUseLike);
@@ -354,6 +355,9 @@ export default function DiscoverScreen() {
   // Get photo URL
   const photoUrl = currentProfileToShow.photos?.[0] || null;
 
+  // Get trust score for current profile
+  const trustData = currentProfileToShow ? getTrustScore(currentProfileToShow.user_id) : null;
+
   return (
     <View className="flex-1 bg-black">
       <LinearGradient
@@ -504,6 +508,24 @@ export default function DiscoverScreen() {
                   <View className="absolute top-3 left-3 bg-pink-500/90 px-3 py-1.5 rounded-full flex-row items-center">
                     <Users size={14} color="white" />
                     <Text className="text-white text-xs font-medium ml-1">Has Partner</Text>
+                  </View>
+                )}
+                {/* Trust score badge */}
+                {trustData && trustData.overall_score >= 50 && (
+                  <View className={cn(
+                    'absolute left-3',
+                    currentProfileToShow.linked_partner ? 'top-12' : 'top-3'
+                  )}>
+                    <View className="bg-green-500/90 px-3 py-1.5 rounded-full flex-row items-center">
+                      <Shield size={14} color="white" />
+                      <Text className="text-white text-xs font-bold ml-1">
+                        {trustData.tier === 'ambassador' && '★ Ambassador'}
+                        {trustData.tier === 'verified' && '✓ Verified'}
+                        {trustData.tier === 'trusted' && 'Trusted'}
+                        {trustData.tier === 'member' && 'Member'}
+                        {!trustData.tier && `${trustData.overall_score}`}
+                      </Text>
+                    </View>
                   </View>
                 )}
                 <View className="absolute bottom-4 left-4 right-4">
