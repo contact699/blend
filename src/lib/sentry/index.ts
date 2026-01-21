@@ -19,64 +19,63 @@ const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
  * Call this in the root _layout.tsx before rendering
  */
 export function initSentry() {
-  if (!SENTRY_DSN) {
-    console.warn('Sentry DSN not configured. Error tracking disabled.');
-    return;
-  }
+  try {
+    if (!SENTRY_DSN) {
+      console.warn('Sentry DSN not configured. Error tracking disabled.');
+      return;
+    }
 
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    
-    // Environment based on Expo config
-    environment: __DEV__ ? 'development' : 'production',
-    
-    // App version from Expo config
-    release: Constants.expoConfig?.version ?? '1.0.0',
-    
-    // Only send errors in production (disable in dev)
-    enabled: !__DEV__,
-    
-    // Sample rate for performance monitoring (0.0 to 1.0)
-    tracesSampleRate: __DEV__ ? 0 : 0.2,
-    
-    // Sample rate for session replays (if enabled)
-    // replaysSessionSampleRate: 0.1,
-    // replaysOnErrorSampleRate: 1.0,
-    
-    // Attach stack traces to all messages
-    attachStacktrace: true,
-    
-    // Before sending, filter/modify events
-    beforeSend(event, hint) {
-      // Don't send events in development
-      if (__DEV__) {
-        console.log('Sentry event (dev):', event.message || event.exception);
-        return null;
-      }
+    Sentry.init({
+      dsn: SENTRY_DSN,
       
-      // Filter out known non-critical errors
-      const message = event.message || '';
-      if (
-        message.includes('Network request failed') ||
-        message.includes('timeout') ||
-        message.includes('AbortError')
-      ) {
-        // Log network errors but don't send to Sentry
-        return null;
-      }
+      // Environment based on Expo config
+      environment: __DEV__ ? 'development' : 'production',
       
-      return event;
-    },
-    
-    // Breadcrumb filtering
-    beforeBreadcrumb(breadcrumb) {
-      // Don't log console breadcrumbs in production
-      if (breadcrumb.category === 'console') {
-        return null;
-      }
-      return breadcrumb;
-    },
-  });
+      // App version from Expo config
+      release: Constants.expoConfig?.version ?? '1.0.0',
+      
+      // Only send errors in production (disable in dev)
+      enabled: !__DEV__,
+      
+      // Sample rate for performance monitoring (0.0 to 1.0)
+      tracesSampleRate: __DEV__ ? 0 : 0.2,
+      
+      // Attach stack traces to all messages
+      attachStacktrace: true,
+      
+      // Before sending, filter/modify events
+      beforeSend(event, hint) {
+        // Don't send events in development
+        if (__DEV__) {
+          console.log('Sentry event (dev):', event.message || event.exception);
+          return null;
+        }
+        
+        // Filter out known non-critical errors
+        const message = event.message || '';
+        if (
+          message.includes('Network request failed') ||
+          message.includes('timeout') ||
+          message.includes('AbortError')
+        ) {
+          return null;
+        }
+        
+        return event;
+      },
+      
+      // Breadcrumb filtering
+      beforeBreadcrumb(breadcrumb) {
+        if (breadcrumb.category === 'console') {
+          return null;
+        }
+        return breadcrumb;
+      },
+    });
+  } catch (error) {
+    // Silently fail - don't crash the app if Sentry fails to initialize
+    console.warn('Failed to initialize Sentry:', error);
+  }
 }
 
 // ============================================================================

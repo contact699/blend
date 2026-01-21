@@ -11,10 +11,18 @@ import { usePushNotifications } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
 
 // Initialize Sentry error tracking as early as possible
-initSentry();
+try {
+  initSentry();
+} catch (e) {
+  console.warn('Sentry init failed:', e);
+}
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+try {
+  SplashScreen.preventAutoHideAsync();
+} catch (e) {
+  console.warn('SplashScreen.preventAutoHideAsync failed:', e);
+}
 
 const queryClient = new QueryClient();
 
