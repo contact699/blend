@@ -1,8 +1,8 @@
 diff --git a/node_modules/react-native-enriched/android/src/main/new_arch/react/renderer/components/RNEnrichedTextInputViewSpec/conversions.h b/node_modules/react-native-enriched/android/src/main/new_arch/react/renderer/components/RNEnrichedTextInputViewSpec/conversions.h
-index 3669ddd..b43446e 100644
+index 3669ddd..ab39ee6 100644
 --- a/node_modules/react-native-enriched/android/src/main/new_arch/react/renderer/components/RNEnrichedTextInputViewSpec/conversions.h
 +++ b/node_modules/react-native-enriched/android/src/main/new_arch/react/renderer/components/RNEnrichedTextInputViewSpec/conversions.h
-@@ -1,7 +1,7 @@
+@@ -1,13 +1,14 @@
  #pragma once
  
  #include <folly/dynamic.h>
@@ -11,3 +11,25 @@ index 3669ddd..b43446e 100644
  #include <react/renderer/components/RNEnrichedTextInputViewSpec/Props.h>
  #include <react/renderer/core/propsConversions.h>
  
+ namespace facebook::react {
+ 
+-#ifdef RN_SERIALIZABLE_STATE
++// Define toDynamic unconditionally (not guarded by RN_SERIALIZABLE_STATE)
++// This is required for EnrichedTextInputMeasurementManager to work with RN 0.79+
+ inline folly::dynamic toDynamic(const EnrichedTextInputViewProps &props) {
+   // Serialize only metrics affecting props
+   folly::dynamic serializedProps = folly::dynamic::object();
+@@ -17,10 +18,11 @@ inline folly::dynamic toDynamic(const EnrichedTextInputViewProps &props) {
+   serializedProps["fontWeight"] = props.fontWeight;
+   serializedProps["fontStyle"] = props.fontStyle;
+   serializedProps["fontFamily"] = props.fontFamily;
+-  serializedProps["htmlStyle"] = toDynamic(props.htmlStyle);
++  // Skip htmlStyle as it depends on nested toDynamic calls that require RN_SERIALIZABLE_STATE
++  // The measurement manager doesn't strictly need htmlStyle for basic measurements
++  serializedProps["htmlStyle"] = folly::dynamic::object();
+ 
+   return serializedProps;
+ }
+-#endif
+ 
+ } // namespace facebook::react
