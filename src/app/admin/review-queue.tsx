@@ -52,7 +52,6 @@ export default function ReviewQueueScreen() {
         {
           id: '1',
           reported_user_id: 'user1',
-          reported_by_user_id: null,
           report_type: 'ai_flagged',
           severity: 'critical',
           reason: 'Photo consistency check failed',
@@ -72,7 +71,6 @@ export default function ReviewQueueScreen() {
         {
           id: '2',
           reported_user_id: 'user2',
-          reported_by_user_id: null,
           report_type: 'pattern_detected',
           severity: 'high',
           reason: 'Bot-like messaging patterns detected',
@@ -94,7 +92,6 @@ export default function ReviewQueueScreen() {
         {
           id: '3',
           reported_user_id: 'user3',
-          reported_by_user_id: null,
           report_type: 'ai_flagged',
           severity: 'medium',
           reason: 'Profile text contains scam indicators',
