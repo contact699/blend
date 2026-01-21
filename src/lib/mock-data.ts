@@ -8,7 +8,7 @@ import {
   Message,
   User,
   Like,
-  Pind,
+  Ping,
   EducationArticle,
   QuizQuestion,
   RelationshipAgreement,
@@ -417,10 +417,10 @@ export const MOCK_LIKES: Like[] = [
   },
 ];
 
-// Mock Pinds (private messages without matching)
-export const MOCK_PINDS: Pind[] = [
+// Mock Pings (private messages without matching)
+export const MOCK_PINGS: Ping[] = [
   {
-    id: 'pind-1',
+    id: 'ping-1',
     from_user_id: 'user-7',
     to_user_id: 'user-1',
     message: "Hey! I saw your profile and loved your vibe. I'm based in NYC but travel a lot - would love to connect virtually sometime!",
@@ -428,7 +428,7 @@ export const MOCK_PINDS: Pind[] = [
     read: false,
   },
   {
-    id: 'pind-2',
+    id: 'ping-2',
     from_user_id: 'user-10',
     to_user_id: 'user-1',
     message: "We're going to be in SF next month! Would love to grab drinks if you're interested.",
@@ -436,7 +436,7 @@ export const MOCK_PINDS: Pind[] = [
     read: false,
   },
   {
-    id: 'pind-3',
+    id: 'ping-3',
     from_user_id: 'user-11',
     to_user_id: 'user-1',
     message: "Your prompt response about communication really resonated with us. That's exactly what we're looking for too!",

@@ -34,7 +34,7 @@ export default function RecordVideoProfileScreen() {
   const tier = useSubscriptionStore((s) => s.getTier());
 
   // Timer for recording duration
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!hasPermission) {

@@ -59,7 +59,7 @@ export function useRateLimitedAction<T extends any[], R>(
   } = options;
 
   const [isOnCooldown, setIsOnCooldown] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reset = useCallback(() => {
     if (timeoutRef.current) {
@@ -115,7 +115,7 @@ export function useDebouncedAction<T extends any[], R>(
   action: (...args: T) => R,
   delayMs: number = 500
 ): (...args: T) => void {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return useCallback(
     (...args: T) => {
